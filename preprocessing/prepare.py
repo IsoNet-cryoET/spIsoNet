@@ -116,24 +116,26 @@ def get_cubes(inp,settings):
     normalized predicted + normalized orig -> normalize
     rotate by rotation_list and feed to get_cubes_one
     '''
+    #with mrcfile.open("fouriermask.mrc",'r') as mrcmask:
+    mw = "fouriermask.mrc"
     mrc, start = inp
     root_name = mrc.split('/')[-1].split('.')[0]
     current_mrc = '{}/{}_iter{:0>2d}.mrc'.format(settings.result_dir,root_name,settings.iter_count-1)
     with mrcfile.open(mrc) as mrcData:
-        iw_data = mrcData.data.astype(np.float32)*-1
+        iw_data = mrcData.data.astype(np.float32)
     iw_data = normalize(iw_data, percentile = settings.normalize_percentile)
 
     with mrcfile.open(current_mrc) as mrcData:
-        ow_data = mrcData.data.astype(np.float32)*-1
+        ow_data = mrcData.data.astype(np.float32)
     ow_data = normalize(ow_data, percentile = settings.normalize_percentile)
 
-    orig_data = apply_wedge(ow_data, ld1=0, ld2=1) + apply_wedge(iw_data, ld1 = 1, ld2=0)
+    orig_data = apply_wedge(ow_data, ld1=0, ld2=1, mw3d=mw) + apply_wedge(iw_data, ld1 = 1, ld2=0,mw3d=mw)
     #orig_data = ow_data
     orig_data = normalize(orig_data, percentile = settings.normalize_percentile)
 
     rotated_data = np.zeros((len(rotation_list), *orig_data.shape))
 
-    old_rotation = True
+    old_rotation = False
     if old_rotation:
         for i,r in enumerate(rotation_list):
             data = np.rot90(orig_data, k=r[0][1], axes=r[0][0])
@@ -148,8 +150,8 @@ def get_cubes(inp,settings):
             offset = center-np.dot(rot,center)
             rotated_data[i] = affine_transform(orig_data,rot,offset=offset)
     
-    mw = mw2d(settings.crop_size)   
-    datax = apply_wedge_dcube(rotated_data, mw)
+    #mw = mw2d(settings.crop_size)   
+    datax = apply_wedge_dcube(rotated_data, mw, mw3d=mw)
 
     for i in range(len(rotation_list)): 
         data_X = crop_to_size(datax[i], settings.crop_size, settings.cube_size)
@@ -210,21 +212,23 @@ def generate_first_iter_mrc(mrc,settings):
     '''
     Apply mw to the mrc and save as xx_iter00.xx
     '''
+    # with mrcfile.open("fouriermask.mrc",'r') as mrcmask:
+    mw = "fouriermask.mrc"
     root_name = mrc.split('/')[-1].split('.')[0]
     extension = mrc.split('/')[-1].split('.')[1]
     with mrcfile.open(mrc) as mrcData:
-        orig_data = normalize(mrcData.data.astype(np.float32)*-1, percentile = settings.normalize_percentile)
-    orig_data = apply_wedge(orig_data, ld1=1, ld2=0)
+        orig_data = normalize(mrcData.data.astype(np.float32), percentile = settings.normalize_percentile)
+    orig_data = apply_wedge(orig_data, ld1=1, ld2=0, mw3d=mw)
     
     #prefill = True
     if settings.prefill==True:
         rot_data = np.rot90(orig_data, axes=(0,2))
-        rot_data = apply_wedge(rot_data, ld1=0, ld2=1)
+        rot_data = apply_wedge(rot_data, ld1=0, ld2=1,mw3d=mw)
         orig_data = rot_data + orig_data
 
     orig_data = normalize(orig_data, percentile = settings.normalize_percentile)
     with mrcfile.new('{}/{}_iter00.{}'.format(settings.result_dir,root_name, extension), overwrite=True) as output_mrc:
-        output_mrc.set_data(-orig_data)
+        output_mrc.set_data(orig_data)
 
     #preparation files for the first iteration
 def prepare_first_iter(settings):

@@ -92,7 +92,7 @@ class Net:
             root_name = mrc.split('/')[-1].split('.')[0]
             #outData = normalize(predicted[i], percentile = normalize_percentile)
             with mrcfile.new('{}/{}_iter{:0>2d}.mrc'.format(result_dir, root_name, iter_count-1), overwrite=True) as output_mrc:
-                output_mrc.set_data(-predicted[i])
+                output_mrc.set_data(predicted[i])
         
         if variance_out:
             for i,mrc in enumerate(mrc_list):
