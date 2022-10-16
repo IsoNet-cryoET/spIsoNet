@@ -31,7 +31,7 @@ def make_mask(tomo_path, mask_name, mask_boundary = None, side = 5, density_perc
         header_input = n.header
         #print(header_input)
         pixel_size = n.voxel_size
-        tomo = n.data.astype(np.float32)
+        tomo = -1*n.data.astype(np.float32)
     sp=np.array(tomo.shape)
     sp2 = sp//2
     bintomo = resize(tomo,sp2,anti_aliasing=True)
