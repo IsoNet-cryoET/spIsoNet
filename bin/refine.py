@@ -109,7 +109,12 @@ def run(args):
             num_noise_volume = 1000
             if num_iter>=args.noise_start_iter[0] and (not os.path.isdir(args.noise_dir) or len(os.listdir(args.noise_dir))< num_noise_volume ):
                 from IsoNet.util.noise_generator import make_noise_folder
+<<<<<<< HEAD
                 logging.info(args.noise_mode)
+=======
+                
+                print(args.noise_mode)
+>>>>>>> master
                 make_noise_folder(args.noise_dir,args.noise_mode,args.cube_size,num_noise_volume,ncpus=args.preprocessing_ncpus)
             noise_level_series = get_noise_level(args.noise_level,args.noise_start_iter,args.iterations)
             args.noise_level_current =  noise_level_series[num_iter]
