@@ -34,7 +34,7 @@ class Predict_sets(Dataset):
     def __getitem__(self, idx):
         rx = mrcfile.open(self.mrc_list[idx]).data[np.newaxis,:,:,:]
         # rx = mrcfile.open(self.mrc_list[idx]).data[:,:,:,np.newaxis]
-        rx=normalize(-rx, percentile = True)
+        rx=normalize(rx, percentile = True)
 
         return rx
 

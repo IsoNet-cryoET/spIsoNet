@@ -101,7 +101,7 @@ class Net:
             root_name = mrc.split('/')[-1].split('.')[0]
             #outData = normalize(predicted[i], percentile = normalize_percentile)
             with mrcfile.new('{}/{}_iter{:0>2d}.mrc'.format(result_dir, root_name, iter_count-1), overwrite=True) as output_mrc:
-                output_mrc.set_data(-predicted[i])
+                output_mrc.set_data(predicted[i])
  
     
     def predict_tomo(self, args, one_tomo, output_file=None):
@@ -118,7 +118,7 @@ class Net:
         logging.info('predicting:{}'.format(root_name))
 
         with mrcfile.open(one_tomo) as mrcData:
-            real_data = mrcData.data.astype(np.float32)*-1
+            real_data = mrcData.data.astype(np.float32)
             voxelsize = mrcData.voxel_size
 
         real_data = normalize(real_data,percentile=args.normalize_percentile)
@@ -153,7 +153,7 @@ class Net:
 
         outData = normalize(outData,percentile=args.normalize_percentile)
         with mrcfile.new(output_file, overwrite=True) as output_mrc:
-            output_mrc.set_data(-outData)
+            output_mrc.set_data(outData)
             output_mrc.voxel_size = voxelsize
 
         logging.info('Done predicting')

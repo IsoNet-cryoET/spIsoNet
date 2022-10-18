@@ -135,7 +135,7 @@ def get_cubes(inp,settings):
 
     rotated_data = np.zeros((len(rotation_list), *orig_data.shape))
 
-    old_rotation = False
+    old_rotation = True
     if old_rotation:
         for i,r in enumerate(rotation_list):
             data = np.rot90(orig_data, k=r[0][1], axes=r[0][0])
