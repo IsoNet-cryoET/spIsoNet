@@ -733,7 +733,6 @@ class MainWindowUIClass( Ui_MainWindow ):
                 self.lineEdit_continue_iter.setText(data['continue_iter'])
                 self.lineEdit_result_dir_refine.setText(data['result_dir_refine'])
                 self.lineEdit_ncpu.setText(data['ncpu'])
-<<<<<<< HEAD
                 
                 self.lineEdit_epoch.setText(data['epoch'])
                 self.lineEdit_iteration.setText(data['iteration'])
@@ -763,37 +762,6 @@ class MainWindowUIClass( Ui_MainWindow ):
                 self.lineEdit_crop_size_predict.setText(data['crop_size_predict'])
                 self.checkBox_use_deconv_predict.setChecked(data['use_deconv_predict'] == 'True')
                 
-=======
-                
-                self.lineEdit_epoch.setText(data['epoch'])
-                self.lineEdit_iteration.setText(data['iteration'])
-                self.lineEdit_lr.setText(data['lr'])
-                self.lineEdit_steps_per_epoch.setText(data['steps_per_epoch'])
-                self.lineEdit_batch_size.setText(data['batch_size'])
-
-                self.lineEdit_noise_level.setText(data['noise_level'])
-                self.lineEdit_noise_start_iter.setText(data['noise_start_iter'])
-                self.comboBox_noise_mode.setCurrentText(data['noise_mode'])
-
-                self.lineEdit_drop_out.setText(data['drop_out'])
-                self.lineEdit_network_depth.setText(data['network_depth'])
-                self.lineEdit_convs_per_depth.setText(data['convs_per_depth'])
-                self.lineEdit_kernel.setText(data['kernel'])
-                self.lineEdit_filter_base.setText(data['filter_base'])
-                self.checkBox_pool.setChecked(data['pool'] == 'True')
-                self.checkBox_batch_normalization.setChecked(data['batch_normalization'] == 'True')
-                self.checkBox_normalization_percentile.setChecked(data['normalization_percentile'] == 'True')
-
-                self.lineEdit_tomo_star_predict.setText(data['tomo_star_predict'])
-                self.lineEdit_gpuID_predict.setText(data['gpuID_predict'])
-                self.lineEdit_tomo_index_predict.setText(data['tomo_index_predict'])
-                self.lineEdit_pretrain_model_predict.setText(data['pretrain_model_predict'])
-                self.lineEdit_cube_size_predict.setText(data['cube_size_predict'])
-                self.lineEdit_result_dir_predict.setText(data['result_dir_predict'])
-                self.lineEdit_crop_size_predict.setText(data['crop_size_predict'])
-                self.checkBox_use_deconv_predict.setChecked(data['use_deconv_predict'] == 'True')
-                
->>>>>>> master
             except:
                 print("error reading {}!".format(self.setting_file))
 
