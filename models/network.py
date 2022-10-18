@@ -13,13 +13,15 @@ from IsoNet.util.toTile import reform3D
 import sys
 from tqdm import tqdm
 
-class Net:
-    def __init__(self):
-        pass
 
-    def initialize(self):
-        self.model = Unet()
-        print(self.model)
+class Net:
+    def __init__(self, metrics=None):
+    #    pass
+
+    #def initialize(self):
+        self.model = Unet(metrics=metrics)
+        # self.model = self.model.to(memory_format=torch.channels_last)
+        #print(self.model)
 
     def load(self, path):
         checkpoint = torch.load(path)
@@ -36,24 +38,34 @@ class Net:
         model_scripted = torch.jit.script(self.model) # Export to TorchScript
         model_scripted.save(path) # Save
 
-    def train(self, data_path, gpuID=[0,1,2,3], learning_rate=3e-4, batch_size=None, epochs = 10, steps_per_epoch=200, variance_out = False):
-        if batch_size is None:
-            batch_size = len(gpuID)
+    def train(self, data_path, gpuID=[0,1,2,3], learning_rate=3e-4, batch_size=None, epochs = 10, steps_per_epoch=200, acc_grad =False):
+        self.model.learning_rate = learning_rate
+
+        train_batches = int(steps_per_epoch*0.9)
+        val_batches = steps_per_epoch - train_batches
+        if acc_grad:
+            logging.info("use accumulate gradient to reduce GPU memory consumption")
+            batch_size = batch_size//2
+            acc_batches = 2
+            train_batches = train_batches * 2
+            val_batches = val_batches * 2
+        else:
+            acc_batches = 1
 
         train_dataset, val_dataset = get_datasets(data_path)
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True,persistent_workers=True,
                                                 num_workers=batch_size, pin_memory=True, drop_last=True)
+
         val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False,persistent_workers=True,
                                                 pin_memory=True, num_workers=batch_size, drop_last=True)
 
-        self.model.learning_rate = learning_rate
-        self.model.variance_out = variance_out
-        train_batches = int(steps_per_epoch*0.9)
-        val_batches = steps_per_epoch - train_batches
         self.model.train()
+
         trainer = pl.Trainer(
+            accumulate_grad_batches=acc_batches,
             accelerator='gpu',
             devices=gpuID,
+            num_nodes=1,
             max_epochs=epochs,
             limit_train_batches = train_batches,
             limit_val_batches = val_batches,
@@ -61,12 +73,13 @@ class Net:
             enable_progress_bar=True,
             logger=False,
             enable_checkpointing=False,
-            #callbacks=RichProgressBar(),
+            #callbacks=EpochProgressBar(),
             num_sanity_val_steps=0
         )
         trainer.fit(self.model, train_loader, val_loader)        
+        return  self.model.metrics
 
-    def predict(self, mrc_list, result_dir, iter_count, variance_out = True):    
+    def predict(self, mrc_list, result_dir, iter_count):    
 
         bench_dataset = Predict_sets(mrc_list)
         bench_loader = torch.utils.data.DataLoader(bench_dataset, batch_size=4, num_workers=1)
@@ -75,30 +88,20 @@ class Net:
         model.eval()
 
         predicted = []
-        probability =[]
+
         with torch.no_grad():
             for _, val_data in enumerate(bench_loader):
                     res = model(val_data) 
-                    miu = res[0].cpu().detach().numpy().astype(np.float32)
+                    miu = res.cpu().detach().numpy().astype(np.float32)
                     for item in miu:
                         it = item.squeeze(0)
                         predicted.append(it)
-                    sigma = res[1].cpu().detach().numpy().astype(np.float32)
-                    for item in sigma:
-                        p = item.squeeze(0)
-                        probability.append(p)
         
         for i,mrc in enumerate(mrc_list):
             root_name = mrc.split('/')[-1].split('.')[0]
             #outData = normalize(predicted[i], percentile = normalize_percentile)
             with mrcfile.new('{}/{}_iter{:0>2d}.mrc'.format(result_dir, root_name, iter_count-1), overwrite=True) as output_mrc:
-                output_mrc.set_data(predicted[i])
-        
-        if variance_out:
-            for i,mrc in enumerate(mrc_list):
-                root_name = mrc.split('/')[-1].split('.')[0]
-                with mrcfile.new('{}/{}_prob_iter{:0>2d}.mrc'.format(result_dir, root_name, iter_count-1), overwrite=True) as output_mrc:
-                    output_mrc.set_data(probability[i])
+                output_mrc.set_data(-predicted[i])
  
     
     def predict_tomo(self, args, one_tomo, output_file=None):

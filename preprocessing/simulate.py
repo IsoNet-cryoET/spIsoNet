@@ -51,6 +51,7 @@ def apply_wedge_dcube(ori_data, mw2d, mw3d=None):
 
     else:
         import mrcfile
+        print("1",mw3d)
         with mrcfile.open(mw3d, 'r') as mrc:
             mw = mrc.data
         mwshift = np.fft.fftshift(mw)
@@ -104,6 +105,7 @@ def apply_wedge1(ori_data, ld1 = 1, ld2 =0, mw3d = None):
         outData=np.rot90(outData, k=3, axes=(0,1))
         return outData
     else:
+        print(mw3d)
         import mrcfile
         with mrcfile.open(mw3d, 'r') as mrc:
             mw = mrc.data

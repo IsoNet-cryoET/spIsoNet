@@ -334,9 +334,9 @@ class ISONET:
 
         arch: str="unet",
         normalize_percentile: bool = True,
-        probability: bool = True,
 
         prefill: bool = False,
+        low_mem: bool = False
 
     ):
         """
