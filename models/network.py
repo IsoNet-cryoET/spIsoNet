@@ -12,7 +12,7 @@ import logging
 from IsoNet.util.toTile import reform3D
 import sys
 from tqdm import tqdm
-
+from IsoNet.preprocessing.simulate import apply_wedge_dcube
 
 class Net:
     def __init__(self, metrics=None):
@@ -56,7 +56,7 @@ class Net:
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True,persistent_workers=True,
                                                 num_workers=batch_size, pin_memory=True, drop_last=True)
 
-        val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False,persistent_workers=True,
+        val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True,persistent_workers=True,
                                                 pin_memory=True, num_workers=batch_size, drop_last=True)
 
         self.model.train()
@@ -145,7 +145,10 @@ class Net:
             for i in tqdm(range(num_big_batch), file=sys.stdout):#track(range(num_big_batch), description="Processing..."):
                 in_data = torch.from_numpy(np.transpose(data[i*N:(i+1)*N],(0,4,1,2,3)))
                 output = model(in_data)
-                outData[i*N:(i+1)*N] = np.transpose(output.cpu().detach().numpy().astype(np.float32), (0,2,3,4,1) )
+                out_tmp = output.cpu().detach().numpy().astype(np.float32)
+                out_tmp = apply_wedge_dcube(out_tmp, None, mw3d="fouriermask.mrc")
+                out_tmp = np.transpose(out_tmp, (0,2,3,4,1) )
+                outData[i*N:(i+1)*N] = out_tmp  + data[i*N:(i+1)*N]
 
         outData = outData[0:num_patches]
 

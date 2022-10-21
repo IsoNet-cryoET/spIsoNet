@@ -25,7 +25,6 @@ def predict(args):
 
     from IsoNet.models.network import Net
     network = Net()
-    network.initialize()
     network.load(args.model)
 
     if args.batch_size is None:

@@ -127,9 +127,12 @@ def get_cubes(inp,settings):
 
     with mrcfile.open(current_mrc) as mrcData:
         ow_data = mrcData.data.astype(np.float32)
+    # This normalization needs to be confirmed
     ow_data = normalize(ow_data, percentile = settings.normalize_percentile)
-
-    orig_data = apply_wedge(ow_data, ld1=0, ld2=1, mw3d=mw) + apply_wedge(iw_data, ld1 = 1, ld2=0,mw3d=mw)
+    if current_mrc.split("/")[1][0] == 'e':
+        orig_data = iw_data
+    else:
+        orig_data = apply_wedge(ow_data, ld1=0, ld2=1, mw3d=mw) + apply_wedge(iw_data, ld1=1, ld2=0, mw3d=mw)
     #orig_data = ow_data
     orig_data = normalize(orig_data, percentile = settings.normalize_percentile)
 
@@ -218,7 +221,7 @@ def generate_first_iter_mrc(mrc,settings):
     extension = mrc.split('/')[-1].split('.')[1]
     with mrcfile.open(mrc) as mrcData:
         orig_data = normalize(mrcData.data.astype(np.float32), percentile = settings.normalize_percentile)
-    orig_data = apply_wedge(orig_data, ld1=1, ld2=0, mw3d=mw)
+    #orig_data = apply_wedge(orig_data, ld1=1, ld2=0, mw3d=mw)
     
     #prefill = True
     if settings.prefill==True:
@@ -226,7 +229,7 @@ def generate_first_iter_mrc(mrc,settings):
         rot_data = apply_wedge(rot_data, ld1=0, ld2=1,mw3d=mw)
         orig_data = rot_data + orig_data
 
-    orig_data = normalize(orig_data, percentile = settings.normalize_percentile)
+    #orig_data = normalize(orig_data, percentile = settings.normalize_percentile)
     with mrcfile.new('{}/{}_iter00.{}'.format(settings.result_dir,root_name, extension), overwrite=True) as output_mrc:
         output_mrc.set_data(orig_data)
 

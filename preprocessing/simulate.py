@@ -39,7 +39,7 @@ def mw2d(dim,missingAngle=[30,30]):
 
 
 #import tensorflow as tf
-def apply_wedge_dcube(ori_data, mw2d, mw3d=None):
+def apply_wedge_dcube(ori_data, mw2d, mw3d=None, ld1 = 1, ld2 = 0):
     if mw3d is None:
         #if len(ori_data.shape) > 3:
         #    ori_data = np.squeeze(ori_data, axis=-1)
@@ -51,9 +51,12 @@ def apply_wedge_dcube(ori_data, mw2d, mw3d=None):
 
     else:
         import mrcfile
-        print("1",mw3d)
         with mrcfile.open(mw3d, 'r') as mrc:
-            mw = mrc.data
+            mw = mrc.data.copy()
+        #mw[mw<0.5] = 0
+        #mw[mw>=0.5] = 1
+        #mw = np.sqrt((2*mw)/(1+mw))
+        mw = mw*ld1 + (1-mw) * ld2
         mwshift = np.fft.fftshift(mw)
         data = np.zeros_like(ori_data)
         for i,d in enumerate(ori_data):
@@ -105,10 +108,12 @@ def apply_wedge1(ori_data, ld1 = 1, ld2 =0, mw3d = None):
         outData=np.rot90(outData, k=3, axes=(0,1))
         return outData
     else:
-        print(mw3d)
         import mrcfile
         with mrcfile.open(mw3d, 'r') as mrc:
-            mw = mrc.data
+            mw = mrc.data.copy()
+        #mw[mw<0.5] = 0
+        #mw[mw>=0.5] = 1
+        #mw = np.sqrt((2*mw)/(1+mw))
         mw = np.fft.fftshift(mw)
         mw = mw * ld1 + (1-mw) * ld2
 
