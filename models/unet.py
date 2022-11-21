@@ -86,10 +86,10 @@ class Unet(pl.LightningModule):
     
     def forward(self, x):
 
-
+        x_org = x
         x, down_sampling_features = self.encoder(x)
         x = self.decoder(x, down_sampling_features)
-        y_hat = self.final(x)
+        y_hat = self.final(x) + x_org
         return y_hat
     
     def training_step(self, batch, batch_idx):

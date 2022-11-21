@@ -378,6 +378,28 @@ class ISONET:
             f.write(' '.join(sys.argv[0:]) + '\n')
         run(d_args)
 
+    def map_refine(self, half1_file, half2_file, mask_file, fsc_file, limit_res, output_folder="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, weighting=False):
+        logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
+            ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])
+        import mrcfile
+        with mrcfile.open(half1_file, 'r') as mrc:
+            half1 = mrc.data
+        with mrcfile.open(half2_file, 'r') as mrc:
+            half2 = mrc.data
+        with mrcfile.open(mask_file, 'r') as mrc:
+            mask = mrc.data
+        with mrcfile.open(fsc_file, 'r') as mrc:
+            fsc3d = mrc.data
+        from IsoNet.bin.map_refine import map_refine
+        from IsoNet.util.utils import mkfolder
+        mkfolder(output_folder)
+        logging.info("processing half map1")
+        map_refine(half1, mask, fsc3d, pixel_size=1.31, limit_res = limit_res, output_file=output_folder+"/corrected_half1.mrc", weighting = weighting, n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size)
+        logging.info("processing half map2")
+        map_refine(half2, mask, fsc3d, pixel_size=1.31, limit_res = limit_res, output_file=output_folder+"/corrected_half2.mrc", weighting = weighting, n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size)
+        logging.info("Two independent half maps are saved in {}. Please use other software for postprocessing and try difference B factors".format(output_folder))
+
+
     def predict(self, star_file: str, model: str, output_dir: str='./corrected_tomos', gpuID: str = None, cube_size:int=64,
     crop_size:int=96,use_deconv_tomo=True, batch_size:int=None,normalize_percentile: bool=True,log_level: str="info", tomo_idx=None):
         """

@@ -39,7 +39,7 @@ def mw2d(dim,missingAngle=[30,30]):
 
 
 #import tensorflow as tf
-def apply_wedge_dcube(ori_data, mw2d, mw3d=None, ld1 = 1, ld2 = 0):
+def apply_wedge_dcube(ori_data, mw2d = None, mw3d=None, ld1 = 1, ld2 = 0):
     if mw3d is None:
         #if len(ori_data.shape) > 3:
         #    ori_data = np.squeeze(ori_data, axis=-1)
@@ -50,12 +50,13 @@ def apply_wedge_dcube(ori_data, mw2d, mw3d=None, ld1 = 1, ld2 = 0):
         data=np.rot90(data, k=3, axes=(1,2))
 
     else:
-        import mrcfile
-        with mrcfile.open(mw3d, 'r') as mrc:
-            mw = mrc.data.copy()
+        #import mrcfile
+        #with mrcfile.open(mw3d, 'r') as mrc:
+        #    mw = mrc.data.copy()
         #mw[mw<0.5] = 0
         #mw[mw>=0.5] = 1
         #mw = np.sqrt((2*mw)/(1+mw))
+        mw = mw3d
         mw = mw*ld1 + (1-mw) * ld2
         mwshift = np.fft.fftshift(mw)
         data = np.zeros_like(ori_data)
@@ -68,27 +69,7 @@ def apply_wedge_dcube(ori_data, mw2d, mw3d=None, ld1 = 1, ld2 = 0):
 
     return data
 
-def apply_wedge(ori_data, ld1 = 1, ld2 =0):
-    #apply -60~+60 wedge to single cube
-    data = np.rot90(ori_data, k=1, axes=(0,1)) #clock wise of counter clockwise??
-    mw = TwoDPsf(data.shape[1], data.shape[2]).getMW()
-
-    #if inverse:
-    #    mw = 1-mw
-    mw = mw * ld1 + (1-mw) * ld2
-
-    mw3d = np.zeros(data.shape,dtype=np.complex)
-    f_data = np.fft.fftn(data)
-    for i, item in enumerate(f_data):
-        mw3d[i] = mw
-    mwshift = np.fft.fftshift(mw)
-    outData = mwshift*f_data
-    inv = np.fft.ifftn(outData)
-    real = np.real(inv).astype(np.float32)
-    out = np.rot90(real, k=3, axes=(0,1))
-    return out
-
-def apply_wedge1(ori_data, ld1 = 1, ld2 =0, mw3d = None):
+def apply_wedge(ori_data, ld1 = 1, ld2 =0, mw3d = None):
 
     if mw3d is None:
         data = np.rot90(ori_data, k=1, axes=(0,1)) #clock wise of counter clockwise??
@@ -108,12 +89,13 @@ def apply_wedge1(ori_data, ld1 = 1, ld2 =0, mw3d = None):
         outData=np.rot90(outData, k=3, axes=(0,1))
         return outData
     else:
-        import mrcfile
-        with mrcfile.open(mw3d, 'r') as mrc:
-            mw = mrc.data.copy()
+        #import mrcfile
+        #with mrcfile.open(mw3d, 'r') as mrc:
+        #    mw = mrc.data.copy()
         #mw[mw<0.5] = 0
         #mw[mw>=0.5] = 1
         #mw = np.sqrt((2*mw)/(1+mw))
+        mw = mw3d
         mw = np.fft.fftshift(mw)
         mw = mw * ld1 + (1-mw) * ld2
 

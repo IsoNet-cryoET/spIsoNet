@@ -42,7 +42,7 @@ def extract_subtomos(settings):
                 with mrcfile.open(it.rlnMicrographName) as mrcData:
                     orig_data = mrcData.data.astype(np.float32)
             
-
+            orig_data = normalize(orig_data)
             if "rlnMaskName" in md.getLabels() and it.rlnMaskName not in [None, "None"]:
                 with mrcfile.open(it.rlnMaskName) as m:
                     mask_data = m.data
@@ -123,22 +123,22 @@ def get_cubes(inp,settings):
     current_mrc = '{}/{}_iter{:0>2d}.mrc'.format(settings.result_dir,root_name,settings.iter_count-1)
     with mrcfile.open(mrc) as mrcData:
         iw_data = mrcData.data.astype(np.float32)
-    iw_data = normalize(iw_data, percentile = settings.normalize_percentile)
+    #iw_data = normalize(iw_data, percentile = settings.normalize_percentile)
 
     with mrcfile.open(current_mrc) as mrcData:
         ow_data = mrcData.data.astype(np.float32)
     # This normalization needs to be confirmed
-    ow_data = normalize(ow_data, percentile = settings.normalize_percentile)
+    #ow_data = normalize(ow_data, percentile = settings.normalize_percentile)
     if current_mrc.split("/")[1][0] == 'e':
         orig_data = iw_data
     else:
-        orig_data = apply_wedge(ow_data, ld1=0, ld2=1, mw3d=mw) + apply_wedge(iw_data, ld1=1, ld2=0, mw3d=mw)
+        orig_data = apply_wedge(ow_data, ld1=0, ld2=1, mw3d=mw) + iw_data#apply_wedge(iw_data, ld1=1, ld2=0, mw3d=mw)
     #orig_data = ow_data
-    orig_data = normalize(orig_data, percentile = settings.normalize_percentile)
+    #orig_data = normalize(orig_data, percentile = settings.normalize_percentile)
 
     rotated_data = np.zeros((len(rotation_list), *orig_data.shape))
 
-    old_rotation = True
+    old_rotation = False
     if old_rotation:
         for i,r in enumerate(rotation_list):
             data = np.rot90(orig_data, k=r[0][1], axes=r[0][0])
@@ -154,6 +154,7 @@ def get_cubes(inp,settings):
             rotated_data[i] = affine_transform(orig_data,rot,offset=offset)
     
     #mw = mw2d(settings.crop_size)   
+    #datax = normalize(apply_wedge_dcube(rotated_data, mw, mw3d=mw))
     datax = apply_wedge_dcube(rotated_data, mw, mw3d=mw)
 
     for i in range(len(rotation_list)): 
@@ -220,7 +221,9 @@ def generate_first_iter_mrc(mrc,settings):
     root_name = mrc.split('/')[-1].split('.')[0]
     extension = mrc.split('/')[-1].split('.')[1]
     with mrcfile.open(mrc) as mrcData:
-        orig_data = normalize(mrcData.data.astype(np.float32), percentile = settings.normalize_percentile)
+    #    orig_data = normalize(mrcData.data.astype(np.float32), percentile = settings.normalize_percentile)
+         orig_data = mrcData.data.astype(np.float32)
+
     #orig_data = apply_wedge(orig_data, ld1=1, ld2=0, mw3d=mw)
     
     #prefill = True
