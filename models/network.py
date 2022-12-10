@@ -91,7 +91,6 @@ class Net:
         model.eval()
 
         predicted = []
-
         with torch.no_grad():
             for _, val_data in enumerate(bench_loader):
                     res = model(val_data) 
@@ -99,7 +98,6 @@ class Net:
                     for item in miu:
                         it = item.squeeze(0)
                         predicted.append(it)
-        
         for i,mrc in enumerate(mrc_list):
             root_name = mrc.split('/')[-1].split('.')[0]
 
@@ -110,12 +108,11 @@ class Net:
             if mw3d is not None:
                 with mrcfile.open(mrc, 'r') as origional_mrc:
                     input_data= origional_mrc.data
-                output_data = apply_wedge(output_data, mw3d=mw3d, ld1=0, ld2=1) + apply_wedge(input_data, mw3d=mw3d, ld1=1, ld2=0) 
+                output_data = apply_wedge(output_data, mw3d=mw3d, ld1=0, ld2=1) + input_data#+ apply_wedge(input_data, mw3d=mw3d, ld1=1, ld2=0) 
 
 
             with mrcfile.new(file_name, overwrite=True) as output_mrc:
                 output_mrc.set_data(output_data)
- 
     
     def predict_tomo(self, args, one_tomo, output_file=None):
     #predict one tomogram in mrc format INPUT: mrc_file string OUTPUT: output_file(str) or <root_name>_corrected.mrc
@@ -174,13 +171,13 @@ class Net:
 
         logging.info('Done predicting')
     
-    def predict_map(self, halfmap, fsc3d, output_file, cube_size = 64, crop_size=96, batch_size = 2, voxel_size = 1.31):
+    def predict_map(self, halfmap,fsc3d_full, fsc3d, output_file, cube_size = 64, crop_size=96, batch_size = 4, voxel_size = 1.1):
     #predict one tomogram in mrc format INPUT: mrc_file string OUTPUT: output_file(str) or <root_name>_corrected.mrc
 
 
         logging.info('Inference')
 
-        real_data = normalize(halfmap)
+        real_data = halfmap
         data=np.expand_dims(real_data,axis=-1)
         reform_ins = reform3D(data)
         data = reform_ins.pad_and_crop_new(cube_size,crop_size)
@@ -206,23 +203,32 @@ class Net:
                 #print(in_data)
                 output = model(in_data)
                 out_tmp = output.cpu().detach().numpy().astype(np.float32)
-                out_tmp = apply_wedge_dcube(out_tmp, mw3d=fsc3d,ld1=0, ld2=1)
+                #out_tmp = apply_wedge_dcube(out_tmp, mw3d=fsc3d,ld1=0, ld2=1)
                 out_tmp = np.transpose(out_tmp, (0,2,3,4,1) )
 
-                out_data_tmp = np.transpose(data[i*N:(i+1)*N], (0,4,1,2,3))
-                out_data_tmp = apply_wedge_dcube(out_data_tmp, mw3d=fsc3d,ld1=1, ld2=0)
-                out_data_tmp = np.transpose(out_data_tmp, (0,2,3,4,1) )
+                #out_data_tmp = np.transpose(data[i*N:(i+1)*N], (0,4,1,2,3))
+                #out_data_tmp = apply_wedge_dcube(out_data_tmp, mw3d=fsc3d,ld1=1, ld2=0)
+                #out_data_tmp = np.transpose(out_data_tmp, (0,2,3,4,1) )
 
 
-                outData[i*N:(i+1)*N] = out_tmp  + out_data_tmp
+                outData[i*N:(i+1)*N] = out_tmp#  + out_data_tmp
 
         outData = outData[0:num_patches]
 
         outData=reform_ins.restore_from_cubes_new(outData.reshape(outData.shape[0:-1]), cube_size, crop_size)
+        print(np.std(outData))
+        #outData = apply_wedge(normalize(outData),mw3d=fsc3d_full, ld1=0, ld2=1)
+        
+        outData = apply_wedge(outData,mw3d=fsc3d_full, ld1=0, ld2=1)
+        print(np.std(outData))
+        outData += real_data# apply_wedge(normalize(halfmap),mw3d=fsc3d_full, ld1=1, ld2=0) #0.5*real_data#
+        print(np.std(outData))
+        print(np.std(real_data))
 
         #outData = normalize(outData,percentile=args.normalize_percentile)
         with mrcfile.new(output_file, overwrite=True) as output_mrc:
             output_mrc.set_data(outData.astype(np.float32))
             output_mrc.voxel_size = voxel_size
+
 
         logging.info('Done predicting')

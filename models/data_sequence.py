@@ -11,12 +11,15 @@ class Train_sets(Dataset):
         for d in  [prefix+"_x", prefix+"_y"]:
             p = '{}/{}/'.format(data_dir, d)
             self.path_all.append(sorted([p+f for f in os.listdir(p)]))
+        #print(self.path_all)
 
     def __getitem__(self, idx):
         with mrcfile.open(self.path_all[0][idx]) as mrc:
+            #print(self.path_all[0][idx])
             rx = mrc.data[np.newaxis,:,:,:]
             # rx = mrc.data[:,:,:,np.newaxis]
         with mrcfile.open(self.path_all[1][idx]) as mrc:
+            #print(self.path_all[1][idx])
             ry = mrc.data[np.newaxis,:,:,:]
             # ry = mrc.data[:,:,:,np.newaxis]
         rx = torch.from_numpy(rx.copy())
@@ -32,9 +35,9 @@ class Predict_sets(Dataset):
         self.mrc_list=mrc_list
 
     def __getitem__(self, idx):
-        rx = mrcfile.open(self.mrc_list[idx]).data[np.newaxis,:,:,:]
+        rx = mrcfile.open(self.mrc_list[idx]).data[np.newaxis,:,:,:].copy()
         # rx = mrcfile.open(self.mrc_list[idx]).data[:,:,:,np.newaxis]
-        rx=normalize(rx, percentile = True)
+        #rx=normalize(rx, percentile = True)
 
         return rx
 

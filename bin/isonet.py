@@ -378,26 +378,61 @@ class ISONET:
             f.write(' '.join(sys.argv[0:]) + '\n')
         run(d_args)
 
-    def map_refine(self, half1_file, half2_file, mask_file, fsc_file, limit_res, output_folder="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, weighting=False):
+    def map_refine(self, half1_file, half2_file, mask_file, fsc_file, limit_res, output_dir="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, weighting=False):
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
             ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])
         import mrcfile
         with mrcfile.open(half1_file, 'r') as mrc:
             half1 = mrc.data
+            voxel_size = mrc.voxel_size.x
         with mrcfile.open(half2_file, 'r') as mrc:
             half2 = mrc.data
         with mrcfile.open(mask_file, 'r') as mrc:
             mask = mrc.data
         with mrcfile.open(fsc_file, 'r') as mrc:
             fsc3d = mrc.data
+        logging.info("voxel_size {}".format(voxel_size))
         from IsoNet.bin.map_refine import map_refine
         from IsoNet.util.utils import mkfolder
-        mkfolder(output_folder)
+        mkfolder(output_dir)
         logging.info("processing half map1")
-        map_refine(half1, mask, fsc3d, pixel_size=1.31, limit_res = limit_res, output_file=output_folder+"/corrected_half1.mrc", weighting = weighting, n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size)
+        map_refine(half1, mask, fsc3d, voxel_size=voxel_size, limit_res = limit_res, output_dir = output_dir, output_base="half1", weighting = weighting, n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size)
         logging.info("processing half map2")
-        map_refine(half2, mask, fsc3d, pixel_size=1.31, limit_res = limit_res, output_file=output_folder+"/corrected_half2.mrc", weighting = weighting, n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size)
-        logging.info("Two independent half maps are saved in {}. Please use other software for postprocessing and try difference B factors".format(output_folder))
+        map_refine(half2, mask, fsc3d, voxel_size=voxel_size, limit_res = limit_res, output_dir = output_dir, output_base="half2", weighting = weighting, n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size)
+        logging.info("Two independent half maps are saved in {}. Please use other software for postprocessing and try difference B factors".format(output_dir))
+
+    def map_refine_multi(self, half1_file, half2_file, mask_file, fsc_file, limit_res, output_dir="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, weighting=False):
+        logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
+            ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])
+        half1_list = half1_file.split(',')
+        print(half1_list)
+        half2_list = half2_file.split(',')
+        mask_list = mask_file.split(',')
+        import mrcfile
+        half1 = []
+        half2 = []
+        mask = []
+        for half1_file in half1_list:
+            with mrcfile.open(half1_file, 'r') as mrc:
+                half1.append(mrc.data)
+                voxel_size = mrc.voxel_size.x
+        for half2_file in half2_list:
+            with mrcfile.open(half2_file, 'r') as mrc:
+                half2.append(mrc.data)
+        for mask_file in mask_list:
+            with mrcfile.open(mask_file, 'r') as mrc:
+                mask.append(mrc.data)
+        with mrcfile.open(fsc_file, 'r') as mrc:
+            fsc3d = mrc.data
+        logging.info("voxel_size {}".format(voxel_size))
+        from IsoNet.bin.map_refine import map_refine_multi
+        from IsoNet.util.utils import mkfolder
+        mkfolder(output_dir)
+        logging.info("processing half map1")
+        map_refine_multi(half1, mask, fsc3d, voxel_size=voxel_size, limit_res = limit_res, output_dir = output_dir, output_base="half1", weighting = weighting, n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size)
+        logging.info("processing half map2")
+        map_refine_multi(half2, mask, fsc3d, voxel_size=voxel_size, limit_res = limit_res, output_dir = output_dir, output_base="half2", weighting = weighting, n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size)
+        logging.info("Two independent half maps are saved in {}. Please use other software for postprocessing and try difference B factors".format(output_dir))
 
 
     def predict(self, star_file: str, model: str, output_dir: str='./corrected_tomos', gpuID: str = None, cube_size:int=64,

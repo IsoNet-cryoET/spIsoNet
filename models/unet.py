@@ -70,8 +70,8 @@ class DecoderBlock(pl.LightningModule):
 class Unet(pl.LightningModule):
     def __init__(self,metrics=None):
         super(Unet, self).__init__()
-        filter_base = [64,128,256,320,320,320]
-        #filter_base = [32,64,128,256,320,320]
+        #filter_base = [64,128,256,320,320,320]
+        filter_base = [32,64,128,256,320,320]
         #filter_base = [1,1,1,1,1]
         unet_depth = 3
         n_conv = 3

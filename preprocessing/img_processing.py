@@ -7,7 +7,7 @@ import numpy as np
 
 def normalize(x, percentile = True, pmin=4.0, pmax=96.0, axis=None, clip=False, eps=1e-20):
     """Percentile-based image normalization."""
-
+    percentile=False
     if percentile:
         mi = np.percentile(x,pmin,axis=axis,keepdims=True)
         ma = np.percentile(x,pmax,axis=axis,keepdims=True)
