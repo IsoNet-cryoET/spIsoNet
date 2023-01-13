@@ -171,7 +171,7 @@ class Net:
 
         logging.info('Done predicting')
     
-    def predict_map(self, halfmap,fsc3d_full, fsc3d, output_file, cube_size = 64, crop_size=96, batch_size = 4, voxel_size = 1.1):
+    def predict_map(self, halfmap,halfmap_origional,fsc3d_full, fsc3d, output_file, cube_size = 64, crop_size=96, batch_size = 4, voxel_size = 1.1):
     #predict one tomogram in mrc format INPUT: mrc_file string OUTPUT: output_file(str) or <root_name>_corrected.mrc
 
 
@@ -221,7 +221,7 @@ class Net:
         
         outData = apply_wedge(outData,mw3d=fsc3d_full, ld1=0, ld2=1)
         print(np.std(outData))
-        outData += real_data# apply_wedge(normalize(halfmap),mw3d=fsc3d_full, ld1=1, ld2=0) #0.5*real_data#
+        outData += halfmap_origional# apply_wedge(normalize(halfmap),mw3d=fsc3d_full, ld1=1, ld2=0) #0.5*real_data#
         print(np.std(outData))
         print(np.std(real_data))
 
