@@ -193,8 +193,8 @@ def split_train_test(data_dir,batch_size=8):
     all_path_y = ['y'+i[1:] for i in all_path_x ]
     ind = np.random.permutation(len(all_path_x))[0:num_test]
     for i in ind:
-        os.replace('{}/train_x/{}'.format(data_dir, all_path_x[i]), '{}/test_x/{}'.format(data_dir, all_path_x[i]) )
-        os.replace('{}/train_y/{}'.format(data_dir, all_path_y[i]), '{}/test_y/{}'.format(data_dir, all_path_y[i]) )
+        os.rename('{}/train_x/{}'.format(data_dir, all_path_x[i]), '{}/test_x/{}'.format(data_dir, all_path_x[i]) )
+        os.rename('{}/train_y/{}'.format(data_dir, all_path_y[i]), '{}/test_y/{}'.format(data_dir, all_path_y[i]) )
 
 def extract_subvolume(current_map, n_subvolume, crop_size, mask, output_dir, prefix=''):
     #extract subvolume
