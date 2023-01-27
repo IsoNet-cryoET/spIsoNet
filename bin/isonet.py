@@ -378,7 +378,7 @@ class ISONET:
             f.write(' '.join(sys.argv[0:]) + '\n')
         run(d_args)
 
-    def map_refine(self, half1_file, half2_file, mask_file, fsc_file, limit_res, output_dir="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, weighting=False):
+    def map_refine(self, half1_file, half2_file, mask_file, fsc_file, limit_res=None, output_dir="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, weighting=False):
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
             ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])
         import mrcfile
@@ -392,7 +392,13 @@ class ISONET:
         with mrcfile.open(fsc_file, 'r') as mrc:
             fsc3d = mrc.data
         logging.info("voxel_size {}".format(voxel_size))
-        from IsoNet.bin.map_refine import map_refine
+
+         
+        from IsoNet.bin.map_refine import map_refine, recommended_resolution
+        if limit_res is None:
+            limit_res = recommended_resolution(fsc3d,voxel_size,threshold=0.5)
+            logging.info("Limit resolution to {} for IsoNet missing orientation recovery".format(limit_res))
+
         from IsoNet.util.utils import mkfolder
         mkfolder(output_dir)
         logging.info("processing half map1")

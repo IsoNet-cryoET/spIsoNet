@@ -14,6 +14,24 @@ from IsoNet.preprocessing.img_processing import normalize
 import os
 import sys
 
+def recommended_resolution(fsc3d, voxel_size, threshold = 0.5):
+    diameter = fsc3d.shape[0]
+    center = diameter//2
+
+    grid  = np.mgrid[0:diameter,0:diameter,0:diameter]
+    r = ((grid[0]-center)**2 + (grid[1]-center)**2 + (grid[2]-center)**2)**0.5
+    r = r.astype(np.int32).flatten()
+
+    a = np.zeros(center, dtype = np.float32)
+
+    df = fsc3d.flatten()
+    for i in range(len(a)):
+        
+        a[i] = np.average(df[r==i])
+        if a[i] < threshold:
+            return center/(i+1)*2 * voxel_size
+
+
 def crop_to_size(array, crop_size, cube_size):
         start = crop_size//2 - cube_size//2
         end = crop_size//2 + cube_size//2
