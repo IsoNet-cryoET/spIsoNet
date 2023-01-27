@@ -211,8 +211,8 @@ def split_train_test(data_dir,batch_size=8):
     all_path_y = ['y'+i[1:] for i in all_path_x ]
     ind = np.random.permutation(len(all_path_x))[0:num_test]
     for i in ind:
-        os.rename('{}/train_x/{}'.format(data_dir, all_path_x[i]), '{}/test_x/{}'.format(data_dir, all_path_x[i]) )
-        os.rename('{}/train_y/{}'.format(data_dir, all_path_y[i]), '{}/test_y/{}'.format(data_dir, all_path_y[i]) )
+        os.replace('{}/train_x/{}'.format(data_dir, all_path_x[i]), '{}/test_x/{}'.format(data_dir, all_path_x[i]) )
+        os.replace('{}/train_y/{}'.format(data_dir, all_path_y[i]), '{}/test_y/{}'.format(data_dir, all_path_y[i]) )
 
 def extract_subvolume(current_map, n_subvolume, crop_size, mask, output_dir, prefix=''):
     #extract subvolume
@@ -283,17 +283,21 @@ def map_refine(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "result
     noise_mean=np.average(current_map[mask<0.1])
 
     #main iterations
-    for iter_count in range(1,num_iterations+1):
+    for iter_count in range(0,num_iterations+1):
+        
+        if iter_count == 0:
+            current_filename = "{}/corrected_{}_iter{}.mrc".format(output_dir, output_base, iter_count)
+            with mrcfile.new(current_filename, overwrite=True) as mrc:
+                mrc.set_data(current_map)
+                mrc.update_header_from_data()
+                mrc._set_voxel_size(voxel_size,voxel_size,voxel_size)
+            continue
         
         previous_filename = "{}/corrected_{}_iter{}.mrc".format(output_dir, output_base, iter_count-1)
-
-        if iter_count > 1:
-            with mrcfile.open(previous_filename, 'r') as mrc:
-                current_map = mrc.data
-        else:
-            with mrcfile.new(previous_filename, overwrite=True) as mrc:
-                mrc.set_data(current_map)
-
+            
+        with mrcfile.open(previous_filename, 'r') as mrc:
+            current_map = mrc.data
+           
         current_map = normalize(current_map)
 
         #extract subvolume
@@ -333,8 +337,10 @@ def map_refine(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "result
         current_filename = "{}/corrected_{}_iter{}.mrc".format(output_dir, output_base, iter_count) 
         current_filename1 = "{}/corrected1_{}_iter{}.mrc".format(output_dir, output_base, iter_count) 
         current_filename2 = "{}/corrected2_{}_iter{}.mrc".format(output_dir, output_base, iter_count) 
+        
+        print("\nvoxelsizeiter0:", voxel_size)
         outData = network.predict_map(current_map,halfmap, fsc3d_full, fsc3d, output_file=current_filename, voxel_size = voxel_size )
-
+        print("\nvoxelsizeiter0:", voxel_size)
                 #outData = normalize(outData,percentile=args.normalize_percentile)
         #with mrcfile.new(current_filename, overwrite=True) as output_mrc:
         #    output_mrc.set_data(outData.astype(np.float32))
@@ -347,6 +353,7 @@ def map_refine(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "result
         #     output_mrc.voxel_size = voxel_size
 
         logging.info('Done predicting')
+        
         #network.predict_map(normalize(halfmap), fsc3d, output_file=current_filename_n, voxel_size = voxel_size )
 
     
