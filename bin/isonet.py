@@ -397,7 +397,7 @@ class ISONET:
         from IsoNet.bin.map_refine import map_refine, recommended_resolution
         if limit_res is None:
             limit_res = recommended_resolution(fsc3d,voxel_size,threshold=0.5)
-            logging.info("Limit resolution to {} for IsoNet missing orientation recovery".format(limit_res))
+            logging.info("Limit resolution to {} for IsoNet missing information recovery. You can also tune this paramerter with --limit_res .".format(limit_res))
 
         from IsoNet.util.utils import mkfolder
         mkfolder(output_dir)
