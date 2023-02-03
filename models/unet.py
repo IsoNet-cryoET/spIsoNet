@@ -78,36 +78,88 @@ class Unet(pl.LightningModule):
         self.encoder = EncoderBlock(filter_base=filter_base, unet_depth=unet_depth, n_conv=n_conv)
         self.decoder = DecoderBlock(filter_base=filter_base, unet_depth=unet_depth, n_conv=n_conv)
         self.final = nn.Conv3d(in_channels=filter_base[0], out_channels=1, kernel_size=3, stride=1, padding=1)
+
+        self.mse_layer = nn.Sequential(
+            nn.Conv3d(in_channels=filter_base[0], out_channels=filter_base[0]//2, kernel_size=3, stride=1, padding=1),
+            nn.LeakyReLU(),
+            nn.Conv3d(in_channels=filter_base[0]//2, out_channels=filter_base[0]//4, kernel_size=3, stride=1, padding=1),
+            nn.LeakyReLU(),
+            nn.Conv3d(in_channels=filter_base[0]//4, out_channels=filter_base[0]//8, kernel_size=3, stride=1, padding=1),
+            nn.LeakyReLU(),
+            nn.Conv3d(in_channels=filter_base[0]//8, out_channels=1, kernel_size=1, stride=1, padding=0),
+            nn.Softplus()
+        )
+        self.variance_out = True
+
         self.learning_rate = None#3e-4
         if metrics is None:
             self.metrics = {'train_loss':[], 'val_loss':[]}
         else:
             self.metrics = metrics
     
-    def forward(self, x):
+    # def forward(self, x):
 
-        x_org = x
-        x, down_sampling_features = self.encoder(x)
-        x = self.decoder(x, down_sampling_features)
-        y_hat = self.final(x) + x_org
-        return y_hat
+    #     x_org = x
+    #     x, down_sampling_features = self.encoder(x)
+    #     x = self.decoder(x, down_sampling_features)
+    #     y_hat = self.final(x) + x_org
+    #     return y_hat
     
+    # def training_step(self, batch, batch_idx):
+    #     x, y = batch
+    #     out = self(x)
+    #     loss = nn.L1Loss()(out, y)
+    #     return loss
+
+    def forward(self, x):
+        x_org = x
+        if self.variance_out:
+            with torch.no_grad():
+                x, down_sampling_features = self.encoder(x)
+                x = self.decoder(x, down_sampling_features)
+                y_hat = self.final(x)#  + x_org
+            mse_map = self.mse_layer(x) + 10**-3
+            return [y_hat,mse_map]
+        else:
+            x, down_sampling_features = self.encoder(x)
+            x = self.decoder(x, down_sampling_features)
+            y_hat = self.final(x)#  + x_org
+            return y_hat
+
     def training_step(self, batch, batch_idx):
         x, y = batch
         out = self(x)
-        loss = nn.L1Loss()(out, y)
+        if self.variance_out:
+            #loss = nn.L1Loss()(out[1], torch.abs(out[0]-y))
+            c = 0.6931471805599453 # log(2)
+            loss = torch.mean(torch.div(torch.abs(out[0]-y), out[1]) + torch.log(out[1])) + c
+        else:
+            loss = nn.L1Loss()(out, y)
         return loss
+
     
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate)
         return optimizer 
 
+    # def validation_step(self, batch, batch_idx):
+    #     with torch.no_grad():
+    #         x, y = batch
+    #         out = self(x)
+    #         loss = nn.L1Loss()(out, y)
+    #         return loss
     def validation_step(self, batch, batch_idx):
         with torch.no_grad():
             x, y = batch
             out = self(x)
-            loss = nn.L1Loss()(out, y)
+            if self.variance_out:
+                #loss = nn.L1Loss()(out[1], torch.abs(out[0]-y))
+                c = 0.6931471805599453 # log(2)
+                loss = torch.mean(torch.div(torch.abs(out[0]-y), out[1]) + torch.log(out[1])) + c
+            else:
+                loss = nn.L1Loss()(out, y)
             return loss
+
 
     def training_epoch_end(self, outputs):
         

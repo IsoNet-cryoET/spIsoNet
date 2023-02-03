@@ -232,3 +232,73 @@ class Net:
 
 
         logging.info('Done predicting')
+
+    def predict_map_sigma(self, halfmap,halfmap_origional,fsc3d_full, fsc3d, output_file, cube_size = 64, crop_size=96, batch_size = 4, voxel_size = 1.1, output_sigma_file=None):
+        #predict one tomogram in mrc format INPUT: mrc_file string OUTPUT: output_file(str) or <root_name>_corrected.mrc
+
+
+            logging.info('Inference')
+
+            real_data = halfmap
+            data=np.expand_dims(real_data,axis=-1)
+            reform_ins = reform3D(data)
+            data = reform_ins.pad_and_crop_new(cube_size,crop_size)
+
+            N = batch_size
+            num_patches = data.shape[0]
+            if num_patches%N == 0:
+                append_number = 0
+            else:
+                append_number = N - num_patches%N
+            data = np.append(data, data[0:append_number], axis = 0)
+            num_big_batch = data.shape[0]//N
+            outData = np.zeros(data.shape)
+            out_sigma = np.zeros(data.shape)
+
+            logging.info("total batches: {}".format(num_big_batch))
+
+
+            model = torch.nn.DataParallel(self.model.cuda())
+            model.eval()
+            with torch.no_grad():
+                for i in tqdm(range(num_big_batch), file=sys.stdout):#track(range(num_big_batch), description="Processing..."):
+                    in_data = torch.from_numpy(np.transpose(data[i*N:(i+1)*N],(0,4,1,2,3)))
+                    #print(in_data)
+                    output = model(in_data)
+                    out_tmp = output[0].cpu().detach().numpy().astype(np.float32)
+                    #out_tmp = apply_wedge_dcube(out_tmp, mw3d=fsc3d,ld1=0, ld2=1)
+                    out_tmp = np.transpose(out_tmp, (0,2,3,4,1) )
+                    out_sigma_tmp = output[1].cpu().detach().numpy().astype(np.float32)
+                    out_sigma_tmp = np.transpose(out_sigma_tmp, (0,2,3,4,1) )
+                    #out_data_tmp = np.transpose(data[i*N:(i+1)*N], (0,4,1,2,3))
+                    #out_data_tmp = apply_wedge_dcube(out_data_tmp, mw3d=fsc3d,ld1=1, ld2=0)
+                    #out_data_tmp = np.transpose(out_data_tmp, (0,2,3,4,1) )
+
+
+                    outData[i*N:(i+1)*N] = out_tmp#  + out_data_tmp
+                    out_sigma[i*N:(i+1)*N] = out_sigma_tmp#  + out_data_tmp
+
+            outData = outData[0:num_patches]
+            out_sigma = out_sigma[0:num_patches]
+            outData=reform_ins.restore_from_cubes_new(outData.reshape(outData.shape[0:-1]), cube_size, crop_size)
+            out_sigma=reform_ins.restore_from_cubes_new(out_sigma.reshape(out_sigma.shape[0:-1]), cube_size, crop_size)
+            print(np.std(outData))
+            #outData = apply_wedge(normalize(outData),mw3d=fsc3d_full, ld1=0, ld2=1)
+            
+            outData = apply_wedge(outData,mw3d=fsc3d_full, ld1=0, ld2=1)
+            print(np.std(outData))
+            outData += halfmap_origional# apply_wedge(normalize(halfmap),mw3d=fsc3d_full, ld1=1, ld2=0) #0.5*real_data#
+            print(np.std(outData))
+            print(np.std(real_data))
+
+            #outData = normalize(outData,percentile=args.normalize_percentile)
+            with mrcfile.new(output_file, overwrite=True) as output_mrc:
+                output_mrc.set_data(outData.astype(np.float32))
+                output_mrc.voxel_size = voxel_size
+
+            if output_sigma_file is not None:
+                with mrcfile.new(output_sigma_file, overwrite=True) as output_mrc:
+                    output_mrc.set_data(out_sigma.astype(np.float32))
+                    output_mrc.voxel_size = voxel_size
+
+            logging.info('Done predicting')

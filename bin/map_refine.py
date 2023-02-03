@@ -326,7 +326,7 @@ def map_refine(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "result
         ### start training and save model and json ###
         logging.info("Start training!")
 
-        metrics = network.train(data_dir,gpuID=0, batch_size=8, epochs = 10, steps_per_epoch = 200, acc_grad = False) #train based on init model and save new one as model_iter{num_iter}.h5
+        metrics = network.train(data_dir,gpuID=0, batch_size=8,learning_rate=1e-2, epochs = 10, steps_per_epoch = 200, acc_grad = False) #train based on init model and save new one as model_iter{num_iter}.h5
         logging.info("Start predicting!")
         #network.predict(mrc_list, result_dir, iter_count+1, mw3d=fsc3d)
         #logging.info("Done predicting subvolumes!")
@@ -335,11 +335,12 @@ def map_refine(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "result
         #current_filename_n = "{}/corrected_norm_{}_iter{}.mrc".format(output_dir, output_base, iter_count) 
         current_map = fsc_filter(current_map, fsc3d_full)
         current_filename = "{}/corrected_{}_iter{}.mrc".format(output_dir, output_base, iter_count) 
+        output_sigma_file = "{}/sigma_{}_iter{}.mrc".format(output_dir, output_base, iter_count) 
         current_filename1 = "{}/corrected1_{}_iter{}.mrc".format(output_dir, output_base, iter_count) 
         current_filename2 = "{}/corrected2_{}_iter{}.mrc".format(output_dir, output_base, iter_count) 
         
         print("\nvoxelsizeiter0:", voxel_size)
-        outData = network.predict_map(current_map,halfmap, fsc3d_full, fsc3d, output_file=current_filename, voxel_size = voxel_size )
+        outData = network.predict_map_sigma(current_map,halfmap, fsc3d_full, fsc3d, output_file=current_filename, voxel_size = voxel_size, output_sigma_file=output_sigma_file )
         print("\nvoxelsizeiter0:", voxel_size)
                 #outData = normalize(outData,percentile=args.normalize_percentile)
         #with mrcfile.new(current_filename, overwrite=True) as output_mrc:
