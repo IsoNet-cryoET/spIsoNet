@@ -147,7 +147,7 @@ def get_cubes(mw3d, data_dir, output_dir, crop_size, cube_size, noise_scale,nois
     #print(np.std(datax))    
 
     noise_a = np.random.normal(size = rotated_data.shape)
-    #noise_a = apply_wedge_dcube(noise_a, mw3d=mw3d, ld1 = 0, ld2 = 1)
+    noise_a = apply_wedge_dcube(noise_a, mw3d=mw3d, ld1 = 0, ld2 = 1)
 
     for i in range(len(rotation_list)): 
         #data_mask = crop_to_size(rotated_mask[i], crop_size, cube_size)
@@ -158,6 +158,7 @@ def get_cubes(mw3d, data_dir, output_dir, crop_size, cube_size, noise_scale,nois
 
         #data_X = data_X*data_mask + data_Y*(1-data_mask) + noise* noise_scale
         data_X = data_X + noise* noise_scale
+        data_Y = data_Y - data_X
         #print(np.average(data_Y[data_mask<0.5]))
         #data_Y = data_Y*data_mask + noise_mean * (1-data_mask)# + data_Y*(1-data_mask)# + 0.5*data_Y*(1-data_mask)
         # with mrcfile.new('{}/train_x/x_{}.mrc'.format(data_dir, start), overwrite=True) as output_mrc:
@@ -231,20 +232,21 @@ def extract_subvolume(current_map, n_subvolume, crop_size, mask, output_dir, pre
         mrc_list.append(im_name)
     return mrc_list
 
-def process_3dfsc(halfmap,fsc3d,weighting,crop_size,voxel_size,limit_res):
+def process_3dfsc(halfmap,fsc3d,weighting,crop_size,cube_size,voxel_size,limit_res):
     # Fixed parameters
     full_size = halfmap.shape[0]
 
     fsc3d = fsc3d.copy()
 
-    fsc3d[fsc3d<0] = 0
 
     limit_r = (2*voxel_size)/limit_res
     limit_r2 = 0 #(2*voxel_size)/10
  
     if weighting:
-        logging.info("Apply sqrt(2*FSC/(1+FSC)) for 3DFSC")
-        fsc3d = np.sqrt((2*fsc3d)/(1+fsc3d))
+        #logging.info("Apply sqrt(2*FSC/(1+FSC)) for 3DFSC")
+        #fsc3d = np.sqrt((2*fsc3d)/(1+fsc3d))
+        logging.info("Apply sqrt(FSC) for 3DFSC")
+        fsc3d = np.sqrt(fsc3d)
     else:
         logging.info("No sqrt(2*FSC/(1+FSC)) for 3DFSC")
 
@@ -255,10 +257,18 @@ def process_3dfsc(halfmap,fsc3d,weighting,crop_size,voxel_size,limit_res):
     # with mrcfile.new("psf.mrc",overwrite=True) as mrc:
     #     mrc.set_data(np.real(np.fft.ifftn(np.fft.fftshift(fsc3d))).astype(np.float32))
 
-    fsc3d = rescale_fsc(fsc3d, limit_r, limit_r2, crop_size)
-    return fsc3d, fsc3d_full
+    fsc3d = rescale_fsc(fsc3d_full, limit_r, limit_r2, crop_size)
+    fsc3d_cube = rescale_fsc(fsc3d_full, limit_r, limit_r2, cube_size)
+    threshold = 0.8
+    fsc3d[fsc3d<threshold] = 0
+    fsc3d[fsc3d>threshold] = 1
+    fsc3d_cube[fsc3d_cube<threshold] = 0
+    fsc3d_cube[fsc3d_cube>threshold] = 1
+    fsc3d_full[fsc3d_full<threshold] = 0
+    fsc3d_full[fsc3d_full>threshold] = 1
+    return fsc3d,fsc3d_cube, fsc3d_full
 
-def map_refine(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "results", output_base="half1", n_subvolume = 50, cube_size = 64, crop_size = 96, weighting=False):
+def map_refine(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "results", output_base="half1", n_subvolume = 50, cube_size = 64, crop_size = 96, weighting=False, noise_scale=None):
     log_level = "info"
     if log_level == "debug":
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -269,19 +279,21 @@ def map_refine(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "result
         #logging.basicConfig(format='%(asctime)s.%(msecs)03d, %(levelname)-8s %(message)s',
         #datefmt="%Y-%m-%d,%H:%M:%S",level=logging.INFO,handlers=[logging.StreamHandler(sys.stdout)])
 
-    num_iterations = 10
+    num_iterations = 9
     data_dir = output_dir+"/data"
     mkfolder(data_dir)
-    fsc3d, fsc3d_full = process_3dfsc(halfmap,fsc3d,weighting,crop_size,voxel_size,limit_res)
+    fsc3d, fsc3d_cube, fsc3d_full = process_3dfsc(halfmap,fsc3d,weighting,crop_size,cube_size,voxel_size,limit_res)
 
     from IsoNet.models.network import Net
-    network = Net()
+    network = Net(fsc3d=fsc3d_cube)
 
     halfmap = normalize(halfmap)#, pmin=0, pmax=100)
     current_map = halfmap.copy()
-    noise_scale=np.std(current_map[mask<0.1])*1
+    #noise_scale=np.std(current_map[mask<0.1])*1
+    if noise_scale is not None:
+        noise_scale=np.std(current_map[mask>0.1])*0.2
     noise_mean=np.average(current_map[mask<0.1])
-
+    
     #main iterations
     for iter_count in range(0,num_iterations+1):
         
@@ -298,7 +310,7 @@ def map_refine(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "result
         with mrcfile.open(previous_filename, 'r') as mrc:
             current_map = mrc.data
            
-        current_map = normalize(current_map)
+        #current_map = normalize(current_map)
 
         #extract subvolume
         # seeds=create_cube_seeds(current_map, n_subvolume, crop_size, mask)
@@ -326,21 +338,25 @@ def map_refine(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "result
         ### start training and save model and json ###
         logging.info("Start training!")
 
-        metrics = network.train(data_dir,gpuID=0, batch_size=8,learning_rate=1e-2, epochs = 10, steps_per_epoch = 200, acc_grad = False) #train based on init model and save new one as model_iter{num_iter}.h5
+        metrics = network.train(data_dir,gpuID=0, batch_size=8, epochs = 5, steps_per_epoch = 200, acc_grad = False) #train based on init model and save new one as model_iter{num_iter}.h5
         logging.info("Start predicting!")
         #network.predict(mrc_list, result_dir, iter_count+1, mw3d=fsc3d)
         #logging.info("Done predicting subvolumes!")
 
         #logging.info("Done training!")
         #current_filename_n = "{}/corrected_norm_{}_iter{}.mrc".format(output_dir, output_base, iter_count) 
-        current_map = fsc_filter(current_map, fsc3d_full)
+        #current_map = fsc_filter(current_map, fsc3d_full)
+        #filtered_halfmap = halfmap#fsc_filter(halfmap, fsc3d_full)
+        filtered_halfmap = fsc_filter(halfmap, fsc3d_full)
         current_filename = "{}/corrected_{}_iter{}.mrc".format(output_dir, output_base, iter_count) 
         output_sigma_file = "{}/sigma_{}_iter{}.mrc".format(output_dir, output_base, iter_count) 
         current_filename1 = "{}/corrected1_{}_iter{}.mrc".format(output_dir, output_base, iter_count) 
         current_filename2 = "{}/corrected2_{}_iter{}.mrc".format(output_dir, output_base, iter_count) 
         
         print("\nvoxelsizeiter0:", voxel_size)
-        outData = network.predict_map_sigma(current_map,halfmap, fsc3d_full, fsc3d, output_file=current_filename, voxel_size = voxel_size, output_sigma_file=output_sigma_file )
+        #outData = network.predict_map_sigma(current_map,halfmap, fsc3d_full, fsc3d, output_file=current_filename, voxel_size = voxel_size, output_sigma_file=output_sigma_file )
+        outData = network.predict_map(filtered_halfmap,halfmap, fsc3d_full, fsc3d, output_file=current_filename, voxel_size = voxel_size)
+
         print("\nvoxelsizeiter0:", voxel_size)
                 #outData = normalize(outData,percentile=args.normalize_percentile)
         #with mrcfile.new(current_filename, overwrite=True) as output_mrc:
@@ -360,7 +376,7 @@ def map_refine(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "result
     
     
     
-def map_refine_multi(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "results", output_base="half1", n_subvolume = 50, cube_size = 64, crop_size = 96, weighting=False):
+def map_refine_multi(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "results", output_base="half1", n_subvolume = 50, cube_size = 64, crop_size = 96, weighting=False, noise_scale=None):
     log_level = "info"
     if log_level == "debug":
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
@@ -386,12 +402,11 @@ def map_refine_multi(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "
     num_iterations = 10
     data_dir = output_dir+"/data"
     mkfolder(data_dir)
-
-
-    fsc3d, fsc3d_full = process_3dfsc(halfmap[0],fsc3d,weighting,crop_size,voxel_size,limit_res)
+    fsc3d, fsc3d_cube, fsc3d_full = process_3dfsc(halfmap[0],fsc3d,weighting,crop_size,cube_size,voxel_size,limit_res)
 
     from IsoNet.models.network import Net
-    network = Net()
+    network = Net(fsc3d=fsc3d_cube)
+
     current_map = []
     #main iterations
     for iter_count in range(1,num_iterations+1):
@@ -414,9 +429,10 @@ def map_refine_multi(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "
             
             mrc_list = extract_subvolume(current_map[i], n_sub_list[i], crop_size, mask[i], output_dir,prefix=str(i))
 
-            noise_scale=np.std(current_map[i][mask[i]<0.1])
-            noise_mean=np.average(current_map[i][mask[i]<0.1])
-
+            #if noise_scale is not None:
+            #    noise_scale=np.std(current_map[mask>0.1])*0.2
+            noise_scale = 0
+            noise_mean = 0
             logging.info("Start Iteration{}!".format(iter_count))
 
             logging.info("Start preparing subvolumes!")
@@ -427,7 +443,7 @@ def map_refine_multi(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "
         ### start training and save model and json ###
         logging.info("Start training!")
 
-        metrics = network.train(data_dir,gpuID=0, batch_size=8, epochs = 5, steps_per_epoch = 200, acc_grad = False) #train based on init model and save new one as model_iter{num_iter}.h5
+        metrics = network.train(data_dir,gpuID=0, batch_size=8, epochs = 10, steps_per_epoch = 200, acc_grad = False) #train based on init model and save new one as model_iter{num_iter}.h5
         logging.info("Start predicting!")
         #network.predict(mrc_list, result_dir, iter_count+1, mw3d=fsc3d)
         #logging.info("Done predicting subvolumes!")
@@ -440,7 +456,7 @@ def map_refine_multi(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "
         #outData = network.predict_map(halfmap, fsc3d_full, fsc3d, output_file=current_filename, voxel_size = voxel_size )
         network.save("{}/model_{}_iter{}.h5".format(output_dir, output_base, iter_count))
         for i,h in enumerate(halfmap):
-            current_map[i] = fsc_filter(current_map[i], fsc3d_full)
+            current_map[i] = fsc_filter(halfmap[i], fsc3d_full)
             current_filename = "{}/corrected{}_{}_iter{}.mrc".format(output_dir,i, output_base, iter_count) 
             current_filename1 = "{}/corrected1_{}_iter{}.mrc".format(output_dir, output_base, iter_count) 
             current_filename2 = "{}/corrected2_{}_iter{}.mrc".format(output_dir, output_base, iter_count) 

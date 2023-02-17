@@ -3,6 +3,26 @@ import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 import logging
+def apply_wedge_dcube_torch(ori_data, mw2d = None, mw3d=None, ld1 = 1, ld2 = 0):
+
+    #import mrcfile
+    #with mrcfile.open(mw3d, 'r') as mrc:
+    #    mw = mrc.data.copy()
+    #mw[mw<0.5] = 0
+    #mw[mw>=0.5] = 1
+    #mw = np.sqrt((2*mw)/(1+mw))
+    mw = mw3d
+    mw = mw*ld1 + (1-mw) * ld2
+    mwshift = torch.fft.fftshift(mw)
+    data = torch.zeros_like(ori_data)
+    for i,d in enumerate(ori_data):
+        f_data = torch.fft.fftn(d)
+        outData = mwshift*f_data
+        inv = torch.fft.ifftn(outData)
+        data[i] = torch.real(inv)
+        #data[i] = normalize(data[i],percentile=True)
+
+    return data
 class ConvBlock(pl.LightningModule):
     # conv_per_depth fixed to 2
     def __init__(self, in_channels, out_channels, n_conv, kernel_size =3, stride=1, padding=1):
@@ -68,7 +88,7 @@ class DecoderBlock(pl.LightningModule):
         return x
 
 class Unet(pl.LightningModule):
-    def __init__(self,metrics=None):
+    def __init__(self,fsc3d=None,metrics=None):
         super(Unet, self).__init__()
         #filter_base = [64,128,256,320,320,320]
         filter_base = [32,64,128,256,320,320]
@@ -78,7 +98,7 @@ class Unet(pl.LightningModule):
         self.encoder = EncoderBlock(filter_base=filter_base, unet_depth=unet_depth, n_conv=n_conv)
         self.decoder = DecoderBlock(filter_base=filter_base, unet_depth=unet_depth, n_conv=n_conv)
         self.final = nn.Conv3d(in_channels=filter_base[0], out_channels=1, kernel_size=3, stride=1, padding=1)
-
+        self.fsc3d = torch.from_numpy(fsc3d).cuda()
         self.mse_layer = nn.Sequential(
             nn.Conv3d(in_channels=filter_base[0], out_channels=filter_base[0]//2, kernel_size=3, stride=1, padding=1),
             nn.LeakyReLU(),
@@ -89,7 +109,7 @@ class Unet(pl.LightningModule):
             nn.Conv3d(in_channels=filter_base[0]//8, out_channels=1, kernel_size=1, stride=1, padding=0),
             nn.Softplus()
         )
-        self.variance_out = True
+        self.variance_out = False
 
         self.learning_rate = None#3e-4
         if metrics is None:
@@ -123,7 +143,7 @@ class Unet(pl.LightningModule):
         else:
             x, down_sampling_features = self.encoder(x)
             x = self.decoder(x, down_sampling_features)
-            y_hat = self.final(x)#  + x_org
+            y_hat = self.final(x)
             return y_hat
 
     def training_step(self, batch, batch_idx):
@@ -134,7 +154,13 @@ class Unet(pl.LightningModule):
             c = 0.6931471805599453 # log(2)
             loss = torch.mean(torch.div(torch.abs(out[0]-y), out[1]) + torch.log(out[1])) + c
         else:
-            loss = nn.L1Loss()(out, y)
+            #z = out + x
+            #z = apply_wedge_dcube_torch(z,mw3d=self.fsc3d)
+            #z = y + x
+            #zp = apply_wedge_dcube_torch(z,mw3d=self.fsc3d,ld1=0,ld2=1)
+            loss = nn.L1Loss()(out, y)# + nn.L1Loss()(zp, out)
+            #loss = nn.L1Loss()(zp, out)
+            #loss = nn.L1Loss()(out, y)# + nn.L1Loss()(zp, out)
         return loss
 
     

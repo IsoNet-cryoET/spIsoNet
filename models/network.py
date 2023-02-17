@@ -16,11 +16,11 @@ from IsoNet.preprocessing.simulate import apply_wedge_dcube
 from IsoNet.preprocessing.simulate import apply_wedge
 
 class Net:
-    def __init__(self, metrics=None):
+    def __init__(self,fsc3d=None, metrics=None):
     #    pass
 
     #def initialize(self):
-        self.model = Unet(metrics=metrics)
+        self.model = Unet(fsc3d=fsc3d, metrics=metrics)
         #self.model.half()
         # self.model = self.model.to(memory_format=torch.channels_last)
         #print(self.model)
@@ -219,9 +219,10 @@ class Net:
         print(np.std(outData))
         #outData = apply_wedge(normalize(outData),mw3d=fsc3d_full, ld1=0, ld2=1)
         
-        outData = apply_wedge(outData,mw3d=fsc3d_full, ld1=0, ld2=1)
+        #outData = apply_wedge(outData,mw3d=fsc3d_full, ld1=0, ld2=1)
         print(np.std(outData))
         outData += halfmap_origional# apply_wedge(normalize(halfmap),mw3d=fsc3d_full, ld1=1, ld2=0) #0.5*real_data#
+        #outData += apply_wedge(halfmap_origional,mw3d=fsc3d_full, ld1=1, ld2=0)
         print(np.std(outData))
         print(np.std(real_data))
 
@@ -285,7 +286,7 @@ class Net:
             print(np.std(outData))
             #outData = apply_wedge(normalize(outData),mw3d=fsc3d_full, ld1=0, ld2=1)
             
-            outData = apply_wedge(outData,mw3d=fsc3d_full, ld1=0, ld2=1)
+            #outData = apply_wedge(outData,mw3d=fsc3d_full, ld1=0, ld2=1)
             print(np.std(outData))
             outData += halfmap_origional# apply_wedge(normalize(halfmap),mw3d=fsc3d_full, ld1=1, ld2=0) #0.5*real_data#
             print(np.std(outData))

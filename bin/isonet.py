@@ -382,6 +382,7 @@ class ISONET:
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
             ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])
         import mrcfile
+        import numpy as np
         with mrcfile.open(half1_file, 'r') as mrc:
             half1 = mrc.data
             voxel_size = mrc.voxel_size.x
@@ -399,12 +400,21 @@ class ISONET:
             limit_res = recommended_resolution(fsc3d,voxel_size,threshold=0.5)
             logging.info("Limit resolution to {} for IsoNet missing information recovery. You can also tune this paramerter with --limit_res .".format(limit_res))
 
+        #noise_scale=np.std(half1[mask>0.1])
+        #print("noise_scale",noise_scale)
+        diff_map = half1-half2
+        #noise_scale = np.std(diff_map[diff_map!=0])/1.414
+        noise_scale = np.std(diff_map[mask>0])/1.414
+
+        print("diff_map_ns",noise_scale)
+
+
         from IsoNet.util.utils import mkfolder
         mkfolder(output_dir)
         logging.info("processing half map1")
-        map_refine(half1, mask, fsc3d, voxel_size=voxel_size, limit_res = limit_res, output_dir = output_dir, output_base="half1", weighting = weighting, n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size)
+        map_refine(half1, mask, fsc3d, voxel_size=voxel_size, limit_res = limit_res, output_dir = output_dir, output_base="half1", weighting = weighting, n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size,noise_scale=noise_scale)
         logging.info("processing half map2")
-        map_refine(half2, mask, fsc3d, voxel_size=voxel_size, limit_res = limit_res, output_dir = output_dir, output_base="half2", weighting = weighting, n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size)
+        map_refine(half2, mask, fsc3d, voxel_size=voxel_size, limit_res = limit_res, output_dir = output_dir, output_base="half2", weighting = weighting, n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size,noise_scale=noise_scale)
         logging.info("Two independent half maps are saved in {}. Please use other software for postprocessing and try difference B factors".format(output_dir))
 
     def map_refine_multi(self, half1_file, half2_file, mask_file, fsc_file, limit_res, output_dir="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, weighting=False):
