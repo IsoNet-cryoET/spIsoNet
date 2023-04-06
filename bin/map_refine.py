@@ -259,7 +259,7 @@ def process_3dfsc(halfmap,fsc3d,weighting,crop_size,cube_size,voxel_size,limit_r
 
     fsc3d = rescale_fsc(fsc3d_full, limit_r, limit_r2, crop_size)
     fsc3d_cube = rescale_fsc(fsc3d_full, limit_r, limit_r2, cube_size)
-    threshold = 0.8
+    threshold = 0.7
     fsc3d[fsc3d<threshold] = 0
     fsc3d[fsc3d>threshold] = 1
     fsc3d_cube[fsc3d_cube<threshold] = 0

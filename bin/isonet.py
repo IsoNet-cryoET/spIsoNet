@@ -378,7 +378,7 @@ class ISONET:
             f.write(' '.join(sys.argv[0:]) + '\n')
         run(d_args)
 
-    def map_refine(self, half1_file, half2_file, mask_file, fsc_file, limit_res=None, output_dir="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, weighting=False):
+    def map_refine(self, half1_file, half2_file, mask_file, fsc_file=None, limit_res=None, output_dir="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, weighting=False):
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
             ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])
         import mrcfile
@@ -390,8 +390,14 @@ class ISONET:
             half2 = mrc.data
         with mrcfile.open(mask_file, 'r') as mrc:
             mask = mrc.data
-        with mrcfile.open(fsc_file, 'r') as mrc:
-            fsc3d = mrc.data
+        if fsc_file is not None:
+            with mrcfile.open(fsc_file, 'r') as mrc:
+                fsc3d = mrc.data
+        else:
+            logging.info("calculating 3D FSC, this will approximately take 1 min and need 32GB RAM")
+            from IsoNet.util.FSC import get_FSC_map, ThreeD_FSC
+            FSC_map = get_FSC_map([half1, half2])
+            fsc3d = ThreeD_FSC(FSC_map)
         logging.info("voxel_size {}".format(voxel_size))
 
          
