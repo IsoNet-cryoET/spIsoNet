@@ -7,10 +7,13 @@ from numpy.fft import fftshift, fftn
 #from scipy.ndimage import zoom
 from skimage.transform import resize
 from scipy.spatial.distance import pdist,squareform
+from multiprocessing import Pool
 
-def get_FSC_map(half_maps):
-    f1 = fftshift(fftn(halfmaps[0]))
-    f2 = fftshift(fftn(halfmaps[1]))
+def get_FSC_map(halfmaps, mask):
+    h1 = halfmaps[0] * mask
+    h2 = halfmaps[1] * mask
+    f1 = fftshift(fftn(h1))
+    f2 = fftshift(fftn(h2))
     ret = np.real(np.multiply(f1,np.conj(f2)))
     n1 = np.real(np.multiply(f1,np.conj(f1)))
     n2 = np.real(np.multiply(f2,np.conj(f2)))
@@ -28,31 +31,137 @@ def rotational_average(input_map):
     for i in range(nz//2):
         FSC_curve[i] = np.average(input_map[index==i])
     return FSC_curve
+# from functools import partial
+
+
+# def average_by_orientations(args):
+#     i, FSC_values, threshold, dist_mat = args
+#     return np.average(FSC_values[dist_mat[i] < 1 - threshold])
+
+# import logging
+# def ThreeD_FSC(FSC_map, angle=20, resize_to=96):
+#     nz_origional,ny,nx = FSC_map.shape
+
+#     FSC_map = resize(FSC_map,[resize_to, resize_to, resize_to])
+
+#     threshold = np.cos(np.deg2rad(angle))
+#     nz = resize_to
+#     r = np.arange(nz)-nz//2
+#     [Z,Y,X] = np.meshgrid(r,r,r)
+#     index = np.round(np.sqrt(Z**2+Y**2+X**2))
+
+#     out = np.zeros_like(FSC_map)
+#     out[nz//2,nz//2,nz//2] = 1
+#     FSC_map = FSC_map.astype(np.float32)
+#     pool = Pool(4)
+#     for i in range(1,nz//2):
+#         pixels_T = np.where(index==i)
+#         pixels = np.transpose(pixels_T)
+#         dist_mat = squareform(pdist(pixels-nz//2, 'cosine')).astype(np.float32)
+#         FSC_values = FSC_map[pixels_T]
+#         logging.info("start")
+#         f = lambda i : np.average(FSC_values[dist_mat[i]<1-threshold])
+#         out_list = list(map(f, np.arange(len(pixels))))
+#         #print(len(pixels))
+#         #args = [(j, FSC_values, threshold, dist_mat) for j in range(len(pixels))]
+#         #out_list = list(pool.map(average_by_orientations, args, chunksize=1000))
+#         logging.info("end")
+#         #f = partial(average_by_orientations, FSC_values, threshold)
+#         #with Pool(5, initializer=average_by_orientations, initargs=(FSC_values, threshold,)) as p:
+#             #out_list = list(p.map(f, np.arange(len(pixels))))
+#         #    out_list = list(p.map(dist_mat))
+        
+#         #out_list = average_by_orientations_parallel(FSC_values, threshold, dist_mat)
+#         #print("end")
+#         out[pixels_T] = out_list
+#     out = resize(out,[nz_origional, nz_origional, nz_origional])
+#     return out    
+
+# import logging
+# from scipy.spatial import cKDTree
+# def average_by_orientations(args):
+#     i, FSC_values, threshold, dist_mat = args
+#     return np.average(FSC_values[dist_mat[i] < 1 - threshold])
+# def ThreeD_FSC(FSC_map, angle=20, resize_to=96):
+#     nz_origional,ny,nx = FSC_map.shape
+
+#     FSC_map = resize(FSC_map,[resize_to, resize_to, resize_to])
+
+#     threshold = 2*np.sin(np.deg2rad(angle)/2.0)
+
+#     nz = resize_to
+#     r = np.arange(nz)-nz//2
+#     [Z,Y,X] = np.meshgrid(r,r,r)
+#     index = np.round(np.sqrt(Z**2+Y**2+X**2))
+
+#     FSC_map = FSC_map.astype(np.float32)
+#     out = np.zeros_like(FSC_map)
+#     out[nz//2,nz//2,nz//2] = 1
     
-def ThreeD_FSC(FSC_map, angle=20, resize_to=96):
-    nz_origional,ny,nx = FSC_map.shape
+#     for i in range(1,nz//2):
+#         pixels_T = np.where(index==i)
+#         pixels = np.transpose(pixels_T)
+#         print(pixels.shape)
+#         logging.info("start")
+#         point_tree = cKDTree(pixels)
+#         r0 = i * threshold
+        
+#         values = np.zeros(len(pixels))
+#         FSC_values = FSC_map[pixels_T]
+#         print(FSC_values.shape)
+#         for j, pixel in enumerate(pixels):
+#             values[j] = np.average(FSC_values[point_tree.query_ball_point(pixel, r0)] )
+#         out[pixels_T] = values
+#         logging.info("end")
+
+#     out = resize(out,[nz_origional, nz_origional, nz_origional])
+#     return out    
+
+
+import numpy as np
+from scipy.spatial import cKDTree
+from skimage.transform import resize
+from multiprocessing import Pool
+
+def calculate_FSC(pixels_T, FSC_values, point_tree, r0):
+    values = np.zeros(len(pixels_T[0]))
+    for j, pixel in enumerate(zip(pixels_T[0], pixels_T[1], pixels_T[2])):
+        values[j] = np.average(FSC_values[point_tree.query_ball_point(pixel, r0)])
+    return values
+
+def ThreeD_FSC(FSC_map, angle=20, resize_to=400, n_processes=16):
+    nz_origional, ny, nx = FSC_map.shape
 
     FSC_map = resize(FSC_map,[resize_to, resize_to, resize_to])
 
-    threshold = np.cos(np.deg2rad(angle))
-    nz = resize_to
-    r = np.arange(nz)-nz//2
-    [Z,Y,X] = np.meshgrid(r,r,r)
-    index = np.round(np.sqrt(Z**2+Y**2+X**2))
+    threshold = 2 * np.sin(np.deg2rad(angle) / 2.0)
 
+    nz = resize_to
+    r = np.arange(nz) - nz // 2
+    [Z,Y,X] = np.meshgrid(r,r,r)
+    index = np.round(np.sqrt(Z ** 2 + Y ** 2 + X ** 2))
+
+    FSC_map = FSC_map.astype(np.float32)
     out = np.zeros_like(FSC_map)
-    out[nz//2,nz//2,nz//2] = 1
-    
-    for i in range(1,nz//2):
-        pixels_T = np.where(index==i)
-        pixels = np.transpose(pixels_T)
-        dist_mat = squareform(pdist(pixels-nz//2, 'cosine'))
-        FSC_values = FSC_map[pixels_T]
-        f = lambda i : np.average(FSC_values[dist_mat[i]<1-threshold])
-        out_list = list(map(f, np.arange(len(pixels))))
-        out[pixels_T] = out_list
+    out[nz // 2, nz // 2, nz // 2] = 1
+
+    with Pool(processes=n_processes) as pool:
+        results = []
+        for i in range(1, nz // 2):
+            pixels_T = np.where(index == i)
+            pixels = np.transpose(pixels_T)
+            point_tree = cKDTree(pixels)
+            r0 = i * threshold
+            FSC_values = FSC_map[pixels_T]
+
+            results.append(pool.apply_async(calculate_FSC, (pixels_T, FSC_values, point_tree, r0)))
+
+        for i, result in enumerate(results):
+            pixels_T = np.where(index == i + 1)
+            out[pixels_T] = result.get()
+
     out = resize(out,[nz_origional, nz_origional, nz_origional])
-    return out    
+    return out
 
 if __name__ == '__main__':
         

@@ -378,9 +378,12 @@ class ISONET:
             f.write(' '.join(sys.argv[0:]) + '\n')
         run(d_args)
 
-    def map_refine(self, half1_file, half2_file, mask_file, fsc_file=None, limit_res=None, output_dir="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, weighting=False):
+    def map_refine(self, half1_file, half2_file, mask_file, fsc_file=None, threshold=0.8, limit_res=None, output_dir="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64):
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
-            ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])
+            ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])     
+        from IsoNet.util.utils import mkfolder
+        mkfolder(output_dir)
+        
         import mrcfile
         import numpy as np
         with mrcfile.open(half1_file, 'r') as mrc:
@@ -394,33 +397,28 @@ class ISONET:
             with mrcfile.open(fsc_file, 'r') as mrc:
                 fsc3d = mrc.data
         else:
-            logging.info("calculating 3D FSC, this will approximately take 1 min and need 32GB RAM")
+            logging.info("calculating fast 3DFSC, this will approximately take 1 min and need 30GB RAM")
             from IsoNet.util.FSC import get_FSC_map, ThreeD_FSC
-            FSC_map = get_FSC_map([half1, half2])
+            FSC_map = get_FSC_map([half1, half2], mask)
             fsc3d = ThreeD_FSC(FSC_map)
+            with mrcfile.new(f"{output_dir}/3DFSC.mrc", overwrite=True) as mrc:
+                mrc.set_data(fsc3d.astype(np.float32))
         logging.info("voxel_size {}".format(voxel_size))
 
          
-        from IsoNet.bin.map_refine import map_refine, recommended_resolution
-        if limit_res is None:
-            limit_res = recommended_resolution(fsc3d,voxel_size,threshold=0.5)
-            logging.info("Limit resolution to {} for IsoNet missing information recovery. You can also tune this paramerter with --limit_res .".format(limit_res))
-
-        #noise_scale=np.std(half1[mask>0.1])
-        #print("noise_scale",noise_scale)
+        from IsoNet.bin.map_refine import map_refine
         diff_map = half1-half2
-        #noise_scale = np.std(diff_map[diff_map!=0])/1.414
-        noise_scale = np.std(diff_map[mask>0])/1.414
+        noise_scale = 0#np.std(diff_map[mask>0])/1.414
+        logging.info(f"noise_scale: {noise_scale}")
 
-        print("diff_map_ns",noise_scale)
-
-
-        from IsoNet.util.utils import mkfolder
-        mkfolder(output_dir)
         logging.info("processing half map1")
-        map_refine(half1, mask, fsc3d, voxel_size=voxel_size, limit_res = limit_res, output_dir = output_dir, output_base="half1", weighting = weighting, n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size,noise_scale=noise_scale)
+        map_refine(half1, mask, fsc3d, threshold=threshold, voxel_size=voxel_size, output_dir=output_dir, 
+                   output_base="half1",  limit_res=limit_res,
+                   n_subvolume=n_subvolume, cube_size=cube_size, crop_size=crop_size, noise_scale=noise_scale)
         logging.info("processing half map2")
-        map_refine(half2, mask, fsc3d, voxel_size=voxel_size, limit_res = limit_res, output_dir = output_dir, output_base="half2", weighting = weighting, n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size,noise_scale=noise_scale)
+        map_refine(half2, mask, fsc3d, threshold=threshold, voxel_size=voxel_size, output_dir=output_dir,
+                    output_base="half2", limit_res = limit_res,
+                    n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size, noise_scale=noise_scale)
         logging.info("Two independent half maps are saved in {}. Please use other software for postprocessing and try difference B factors".format(output_dir))
 
     def map_refine_multi(self, half1_file, half2_file, mask_file, fsc_file, limit_res, output_dir="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, weighting=False):
@@ -500,10 +498,8 @@ class ISONET:
         '''
         md = MetaData()
         md.read(star_file)
-        #print(md._data[0].rlnPixelSize)
+        
         from scipy.ndimage import zoom
-        #from skimage.transform import rescale
-        #import numpy as np
         import mrcfile
         if not os.path.isdir(out_folder):
             os.makedirs(out_folder)
