@@ -16,14 +16,9 @@ from IsoNet.preprocessing.simulate import apply_wedge_dcube
 from IsoNet.preprocessing.simulate import apply_wedge
 
 class Net:
-    def __init__(self,fsc3d=None, metrics=None):
-    #    pass
+    def __init__(self,filter_base=64, metrics=None):
+        self.model = Unet(filter_base = filter_base, metrics=metrics)
 
-    #def initialize(self):
-        self.model = Unet(fsc3d=fsc3d, metrics=metrics)
-        #self.model.half()
-        # self.model = self.model.to(memory_format=torch.channels_last)
-        #print(self.model)
 
     def load(self, path):
         checkpoint = torch.load(path)
@@ -36,13 +31,15 @@ class Net:
     def save(self, path):
         state = self.model.state_dict()
         torch.save(state, path)
+
     def save_jit(self, path):
         model_scripted = torch.jit.script(self.model) # Export to TorchScript
         model_scripted.save(path) # Save
 
     def train(self, data_path, gpuID=[0,1,2,3], learning_rate=3e-4, batch_size=None, epochs = 10, steps_per_epoch=200, acc_grad =False):
         self.model.learning_rate = learning_rate
-
+        print(batch_size)
+        acc_grad = True
         train_batches = int(steps_per_epoch*0.9)
         val_batches = steps_per_epoch - train_batches
         if acc_grad:

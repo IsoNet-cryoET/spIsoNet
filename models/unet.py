@@ -88,28 +88,33 @@ class DecoderBlock(pl.LightningModule):
         return x
 
 class Unet(pl.LightningModule):
-    def __init__(self,fsc3d=None,metrics=None):
+    def __init__(self,filter_base = 64, metrics=None):
         super(Unet, self).__init__()
-        #filter_base = [64,128,256,320,320,320]
-        filter_base = [32,64,128,256,320,320]
+        if filter_base == 64:
+            filter_base = [64,128,256,320,320,320]
+        elif filter_base == 32:
+            filter_base = [32,64,128,256,320,320]
+        elif filter_base == 16:
+            filter_base = [16,32,64,128,256,320]
         #filter_base = [1,1,1,1,1]
         unet_depth = 3
         n_conv = 3
         self.encoder = EncoderBlock(filter_base=filter_base, unet_depth=unet_depth, n_conv=n_conv)
         self.decoder = DecoderBlock(filter_base=filter_base, unet_depth=unet_depth, n_conv=n_conv)
         self.final = nn.Conv3d(in_channels=filter_base[0], out_channels=1, kernel_size=3, stride=1, padding=1)
-        self.fsc3d = torch.from_numpy(fsc3d).cuda()
-        self.mse_layer = nn.Sequential(
-            nn.Conv3d(in_channels=filter_base[0], out_channels=filter_base[0]//2, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),
-            nn.Conv3d(in_channels=filter_base[0]//2, out_channels=filter_base[0]//4, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),
-            nn.Conv3d(in_channels=filter_base[0]//4, out_channels=filter_base[0]//8, kernel_size=3, stride=1, padding=1),
-            nn.LeakyReLU(),
-            nn.Conv3d(in_channels=filter_base[0]//8, out_channels=1, kernel_size=1, stride=1, padding=0),
-            nn.Softplus()
-        )
         self.variance_out = False
+        if self.variance_out:
+            self.mse_layer = nn.Sequential(
+                nn.Conv3d(in_channels=filter_base[0], out_channels=filter_base[0]//2, kernel_size=3, stride=1, padding=1),
+                nn.LeakyReLU(),
+                nn.Conv3d(in_channels=filter_base[0]//2, out_channels=filter_base[0]//4, kernel_size=3, stride=1, padding=1),
+                nn.LeakyReLU(),
+                nn.Conv3d(in_channels=filter_base[0]//4, out_channels=filter_base[0]//8, kernel_size=3, stride=1, padding=1),
+                nn.LeakyReLU(),
+                nn.Conv3d(in_channels=filter_base[0]//8, out_channels=1, kernel_size=1, stride=1, padding=0),
+                nn.Softplus()
+            )
+        
 
         self.learning_rate = None#3e-4
         if metrics is None:
@@ -117,20 +122,6 @@ class Unet(pl.LightningModule):
         else:
             self.metrics = metrics
     
-    # def forward(self, x):
-
-    #     x_org = x
-    #     x, down_sampling_features = self.encoder(x)
-    #     x = self.decoder(x, down_sampling_features)
-    #     y_hat = self.final(x) + x_org
-    #     return y_hat
-    
-    # def training_step(self, batch, batch_idx):
-    #     x, y = batch
-    #     out = self(x)
-    #     loss = nn.L1Loss()(out, y)
-    #     return loss
-
     def forward(self, x):
         x_org = x
         if self.variance_out:
@@ -154,26 +145,13 @@ class Unet(pl.LightningModule):
             c = 0.6931471805599453 # log(2)
             loss = torch.mean(torch.div(torch.abs(out[0]-y), out[1]) + torch.log(out[1])) + c
         else:
-            #z = out + x
-            #z = apply_wedge_dcube_torch(z,mw3d=self.fsc3d)
-            #z = y + x
-            #zp = apply_wedge_dcube_torch(z,mw3d=self.fsc3d,ld1=0,ld2=1)
-            loss = nn.L1Loss()(out, y)# + nn.L1Loss()(zp, out)
-            #loss = nn.L1Loss()(zp, out)
-            #loss = nn.L1Loss()(out, y)# + nn.L1Loss()(zp, out)
+            loss = nn.L1Loss()(out, y)
         return loss
-
     
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate)
         return optimizer 
 
-    # def validation_step(self, batch, batch_idx):
-    #     with torch.no_grad():
-    #         x, y = batch
-    #         out = self(x)
-    #         loss = nn.L1Loss()(out, y)
-    #         return loss
     def validation_step(self, batch, batch_idx):
         with torch.no_grad():
             x, y = batch
@@ -186,15 +164,10 @@ class Unet(pl.LightningModule):
                 loss = nn.L1Loss()(out, y)
             return loss
 
-
     def training_epoch_end(self, outputs):
-        
         loss = torch.stack([x['loss'] for x in outputs]).mean().item()
-        #print(outputs)
-        #print(loss)
         self.metrics["train_loss"].append(loss)
         #self.log("train_loss", loss, logger=True,on_epoch=True)
-
 
     def validation_epoch_end(self, outputs):
         loss = torch.stack(outputs).mean().item()

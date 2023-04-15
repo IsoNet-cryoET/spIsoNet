@@ -194,7 +194,7 @@ def map_refine(halfmap, mask, fsc3d, threshold, voxel_size, limit_res=None, outp
 
 
     from IsoNet.models.network import Net
-    network = Net(fsc3d=fsc3d_cube)
+    network = Net(filter_base = 64)
 
     # need to check normalize
     halfmap = normalize(halfmap)

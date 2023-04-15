@@ -5,7 +5,7 @@ import sys
 import mrcfile
 from IsoNet.preprocessing.cubes import create_cube_seeds,crop_cubes,DataCubes
 from IsoNet.preprocessing.img_processing import normalize
-from IsoNet.preprocessing.simulate import apply_wedge1 as  apply_wedge, mw2d
+from IsoNet.preprocessing.simulate import apply_wedge, mw2d
 from IsoNet.preprocessing.simulate import apply_wedge_dcube
 from multiprocessing import Pool
 import numpy as np
@@ -38,7 +38,7 @@ def extract_subtomos(settings):
                 with mrcfile.open(it.rlnDeconvTomoName) as mrcData:
                     orig_data = mrcData.data.astype(np.float32)
             else:        
-                print("Extract from origional tomogram {}".format(it.rlnMicrographName))
+                logging.info("Extract from origional tomogram {}".format(it.rlnMicrographName))
                 with mrcfile.open(it.rlnMicrographName) as mrcData:
                     orig_data = mrcData.data.astype(np.float32)
             
@@ -116,8 +116,6 @@ def get_cubes(inp,settings):
     normalized predicted + normalized orig -> normalize
     rotate by rotation_list and feed to get_cubes_one
     '''
-    #with mrcfile.open("fouriermask.mrc",'r') as mrcmask:
-    mw = "fouriermask.mrc"
     mrc, start = inp
     root_name = mrc.split('/')[-1].split('.')[0]
     current_mrc = '{}/{}_iter{:0>2d}.mrc'.format(settings.result_dir,root_name,settings.iter_count-1)
@@ -127,18 +125,13 @@ def get_cubes(inp,settings):
 
     with mrcfile.open(current_mrc) as mrcData:
         ow_data = mrcData.data.astype(np.float32)
-    # This normalization needs to be confirmed
     #ow_data = normalize(ow_data, percentile = settings.normalize_percentile)
-    if current_mrc.split("/")[1][0] == 'e':
-        orig_data = iw_data
-    else:
-        orig_data = apply_wedge(ow_data, ld1=0, ld2=1, mw3d=mw) + iw_data#apply_wedge(iw_data, ld1=1, ld2=0, mw3d=mw)
-    #orig_data = ow_data
+    orig_data = apply_wedge(ow_data, ld1=0, ld2=1) + iw_data    #apply_wedge(iw_data, ld1=1, ld2=0)
     #orig_data = normalize(orig_data, percentile = settings.normalize_percentile)
 
     rotated_data = np.zeros((len(rotation_list), *orig_data.shape))
-
-    old_rotation = False
+    mw = mw2d(settings.crop_size)  
+    old_rotation = True
     if old_rotation:
         for i,r in enumerate(rotation_list):
             data = np.rot90(orig_data, k=r[0][1], axes=r[0][0])
@@ -153,15 +146,13 @@ def get_cubes(inp,settings):
             offset = center-np.dot(rot,center)
             rotated_data[i] = affine_transform(orig_data,rot,offset=offset)
     
-    #mw = mw2d(settings.crop_size)   
-    #datax = normalize(apply_wedge_dcube(rotated_data, mw, mw3d=mw))
-    datax = apply_wedge_dcube(rotated_data, mw, mw3d=mw)
+    datax = apply_wedge_dcube(rotated_data, mw)
 
     for i in range(len(rotation_list)): 
         data_X = crop_to_size(datax[i], settings.crop_size, settings.cube_size)
         data_Y = crop_to_size(rotated_data[i], settings.crop_size, settings.cube_size)
         get_cubes_one(data_X, data_Y, settings, start = start) 
-        start += 1#settings.ncube
+        start += 1
 
 def get_cubes_list(settings):
     '''
@@ -217,26 +208,24 @@ def generate_first_iter_mrc(mrc,settings):
     Apply mw to the mrc and save as xx_iter00.xx
     '''
     # with mrcfile.open("fouriermask.mrc",'r') as mrcmask:
-    mw = "fouriermask.mrc"
     root_name = mrc.split('/')[-1].split('.')[0]
     extension = mrc.split('/')[-1].split('.')[1]
     with mrcfile.open(mrc) as mrcData:
     #    orig_data = normalize(mrcData.data.astype(np.float32), percentile = settings.normalize_percentile)
          orig_data = mrcData.data.astype(np.float32)
 
-    #orig_data = apply_wedge(orig_data, ld1=1, ld2=0, mw3d=mw)
+    #orig_data = apply_wedge(orig_data, ld1=1, ld2=0)
     
     #prefill = True
     if settings.prefill==True:
         rot_data = np.rot90(orig_data, axes=(0,2))
-        rot_data = apply_wedge(rot_data, ld1=0, ld2=1,mw3d=mw)
+        rot_data = apply_wedge(rot_data, ld1=0, ld2=1)
         orig_data = rot_data + orig_data
 
-    #orig_data = normalize(orig_data, percentile = settings.normalize_percentile)
+    orig_data = normalize(orig_data, percentile = settings.normalize_percentile)
     with mrcfile.new('{}/{}_iter00.{}'.format(settings.result_dir,root_name, extension), overwrite=True) as output_mrc:
-        output_mrc.set_data(orig_data)
+        output_mrc.set_data(-orig_data)
 
-    #preparation files for the first iteration
 def prepare_first_iter(settings):
     if settings.preprocessing_ncpus >1:
         with Pool(settings.preprocessing_ncpus) as p:

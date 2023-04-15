@@ -115,7 +115,6 @@ def simulate_noise(params):
 
 def make_noise_folder(noise_folder,noise_filter,cube_size,num_noise=1000,ncpus=1,large_side=1000):
     mkfolder(noise_folder)
-    print('generating large noise volume; mode: {}'.format(noise_filter))
     NoiseMap.refresh(large_side, noise_filter, ncpus)
                         
     for i in range(num_noise):
