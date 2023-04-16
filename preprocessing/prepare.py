@@ -5,7 +5,7 @@ import sys
 import mrcfile
 from IsoNet.preprocessing.cubes import create_cube_seeds,crop_cubes,DataCubes
 from IsoNet.preprocessing.img_processing import normalize
-from IsoNet.preprocessing.simulate import apply_wedge, mw2d
+from IsoNet.preprocessing.simulate import apply_wedge, mw2D
 from IsoNet.preprocessing.simulate import apply_wedge_dcube
 from multiprocessing import Pool
 import numpy as np
@@ -130,7 +130,7 @@ def get_cubes(inp,settings):
     #orig_data = normalize(orig_data, percentile = settings.normalize_percentile)
 
     rotated_data = np.zeros((len(rotation_list), *orig_data.shape))
-    mw = mw2d(settings.crop_size)  
+    mw = mw2D(settings.crop_size)  
     old_rotation = True
     if old_rotation:
         for i,r in enumerate(rotation_list):
@@ -174,9 +174,9 @@ def get_cubes_list(settings):
     
     # inp: list 0f (mrc_dir, index * rotation times)
 
-    if settings.preprocessing_ncpus > 1:
+    if settings.ncpus > 1:
         func = partial(get_cubes, settings=settings)
-        with Pool(settings.preprocessing_ncpus) as p:
+        with Pool(settings.ncpus) as p:
             p.map(func,inp)
     else:
         for i in inp:
@@ -224,11 +224,11 @@ def generate_first_iter_mrc(mrc,settings):
 
     orig_data = normalize(orig_data, percentile = settings.normalize_percentile)
     with mrcfile.new('{}/{}_iter00.{}'.format(settings.result_dir,root_name, extension), overwrite=True) as output_mrc:
-        output_mrc.set_data(-orig_data)
+        output_mrc.set_data(orig_data)
 
 def prepare_first_iter(settings):
-    if settings.preprocessing_ncpus >1:
-        with Pool(settings.preprocessing_ncpus) as p:
+    if settings.ncpus >1:
+        with Pool(settings.ncpus) as p:
             func = partial(generate_first_iter_mrc, settings=settings)
             p.map(func, settings.mrc_list)
     else:

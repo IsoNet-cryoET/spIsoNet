@@ -30,23 +30,14 @@ def run(args):
                     args.__dict__[item] = args_continue.__dict__[item]
         args = run_whole(args)
 
-        #environment
         os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
         os.environ["CUDA_VISIBLE_DEVICES"]=args.gpuID
-        os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
-        if args.log_level == 'debug':
-            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'
-        else:
-            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-        
-            #check_gpu(args)
-            #from IsoNet.models.unet.predict import predict
-            #from IsoNet.models.unet.train import prepare_first_model, train_data
+
         from IsoNet.models.network import Net
         if not hasattr(args, "metrics"):
-            network = Net()
+            network = Net(filter_base = 64)
         else:
-            network = Net(args.metrics)
+            network = Net(filter_base = 64, metrics = args.metrics)
 
         ###  find current iterations ###        
         current_iter = args.iter_count if hasattr(args, "iter_count") else 1
@@ -110,7 +101,7 @@ def run(args):
             if num_iter>=args.noise_start_iter[0] and (not os.path.isdir(args.noise_dir) or len(os.listdir(args.noise_dir))< num_noise_volume ):
                 from IsoNet.util.noise_generator import make_noise_folder
                 logging.info('generating large noise volume; mode: {}'.format(args.noise_mode))
-                make_noise_folder(args.noise_dir,args.noise_mode,args.cube_size,num_noise_volume,ncpus=args.preprocessing_ncpus)
+                make_noise_folder(args.noise_dir,args.noise_mode,args.cube_size,num_noise_volume,ncpus=args.ncpus)
             noise_level_series = get_noise_level(args.noise_level,args.noise_start_iter,args.iterations)
             args.noise_level_current =  noise_level_series[num_iter]
             logging.info("Noise Level:{}".format(args.noise_level_current))
@@ -136,7 +127,7 @@ def run(args):
             # try:
             metrics = network.train(args.data_dir,gpuID=args.gpuID, 
                             learning_rate=args.learning_rate, batch_size=args.batch_size,
-                            epochs = args.epochs,steps_per_epoch=args.steps_per_epoch,acc_grad=args.low_mem) #train based on init model and save new one as model_iter{num_iter}.h5
+                            epochs = args.epochs,steps_per_epoch=args.steps_per_epoch,acc_grad=args.low_mem, ncpus=args.ncpus) #train based on init model and save new one as model_iter{num_iter}.h5
             # except KeyboardInterrupt as exception: 
             #     sys.exit("Keyboard interrupt")
             args.metrics = metrics

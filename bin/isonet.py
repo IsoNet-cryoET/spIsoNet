@@ -320,7 +320,7 @@ class ISONET:
         result_dir: str='results',
         remove_intermediate: bool =False,
         select_subtomo_number: int = None,
-        preprocessing_ncpus: int = 16,
+        ncpus: int = 16,
         continue_from: str=None,
         epochs: int = 10,
         batch_size: int = None,
@@ -350,7 +350,7 @@ class ISONET:
         :param log_level: (info) debug level, could be 'info' or 'debug'
         :param continue_from: (None) A Json file to continue from. That json file is generated at each iteration of refine.
         :param result_dir: ('results') The name of directory to save refined neural network models and subtomograms
-        :param preprocessing_ncpus: (16) Number of cpu for preprocessing.
+        :param ncpus: (16) Number of cpu for preprocessing.
 
         ************************Training settings************************
 
@@ -378,7 +378,9 @@ class ISONET:
             f.write(' '.join(sys.argv[0:]) + '\n')
         run(d_args)
 
-    def map_refine(self, half1_file, half2_file, mask_file, fsc_file=None, threshold=0.8, limit_res=None, output_dir="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64):
+    def map_refine(self, half1_file, half2_file, mask_file, 
+                   fsc_file=None, threshold=0.8, limit_res=None, output_dir="isonet_maps", 
+                   gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, ncpus=16):
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
             ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])     
         from IsoNet.util.utils import mkfolder
@@ -409,11 +411,11 @@ class ISONET:
             with mrcfile.open(fsc_file, 'r') as mrc:
                 fsc3d = mrc.data
         else:
-            logging.info("calculating fast 3DFSC, this will approximately take x min and need xxGB RAM")
+            logging.info("calculating fast 3DFSC, this will take few minutes")
             if FSC_map is None:
                 FSC_map = get_FSC_map([half1, half2], mask)
             limit_r = int( (2.*voxel_size) / limit_res * (half1.shape[0]/2.) + 1)
-            fsc3d = ThreeD_FSC(FSC_map, limit_r)
+            fsc3d = ThreeD_FSC(FSC_map, limit_r, n_processes=ncpus)
             with mrcfile.new(f"{output_dir}/3DFSC.mrc", overwrite=True) as mrc:
                 mrc.set_data(fsc3d.astype(np.float32))
         logging.info("voxel_size {}".format(voxel_size))

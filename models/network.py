@@ -36,7 +36,7 @@ class Net:
         model_scripted = torch.jit.script(self.model) # Export to TorchScript
         model_scripted.save(path) # Save
 
-    def train(self, data_path, gpuID=[0,1,2,3], learning_rate=3e-4, batch_size=None, epochs = 10, steps_per_epoch=200, acc_grad =False):
+    def train(self, data_path, gpuID=[0,1,2,3], learning_rate=3e-4, batch_size=None, epochs = 10, steps_per_epoch=200, acc_grad =False, ncpus=8):
         self.model.learning_rate = learning_rate
         print(batch_size)
         acc_grad = True
@@ -53,10 +53,10 @@ class Net:
 
         train_dataset, val_dataset = get_datasets(data_path)
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True,persistent_workers=True,
-                                                num_workers=batch_size, pin_memory=True, drop_last=True)
+                                                num_workers=ncpus, pin_memory=True, drop_last=True)
 
         val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True,persistent_workers=True,
-                                                pin_memory=True, num_workers=batch_size, drop_last=True)
+                                                pin_memory=True, num_workers=ncpus, drop_last=True)
 
         self.model.train()
 
@@ -153,9 +153,10 @@ class Net:
                 in_data = torch.from_numpy(np.transpose(data[i*N:(i+1)*N],(0,4,1,2,3)))
                 output = model(in_data)
                 out_tmp = output.cpu().detach().numpy().astype(np.float32)
-                out_tmp = apply_wedge_dcube(out_tmp, None, mw3d="fouriermask.mrc",ld1=0, ld2=1)
+                #out_tmp = apply_wedge_dcube(out_tmp,ld1=0, ld2=1)
+
                 out_tmp = np.transpose(out_tmp, (0,2,3,4,1) )
-                outData[i*N:(i+1)*N] = out_tmp  + data[i*N:(i+1)*N]
+                outData[i*N:(i+1)*N] = out_tmp#  + data[i*N:(i+1)*N]
 
         outData = outData[0:num_patches]
 
