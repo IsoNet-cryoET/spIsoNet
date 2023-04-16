@@ -393,14 +393,27 @@ class ISONET:
             half2 = mrc.data
         with mrcfile.open(mask_file, 'r') as mrc:
             mask = mrc.data
+
+        from IsoNet.util.FSC import get_FSC_map, ThreeD_FSC
+        if limit_res is None:
+            FSC_map = get_FSC_map([half1, half2], mask)
+
+            from IsoNet.bin.map_refine import recommended_resolution
+            limit_res = recommended_resolution(FSC_map, voxel_size, threshold=0.143)
+        else:
+            FSC_map = None
+
+        logging.info("Limit resolution to {} for IsoNet missing information recovery. You can also tune this paramerter with --limit_res .".format(limit_res))
+        
         if fsc_file is not None:
             with mrcfile.open(fsc_file, 'r') as mrc:
                 fsc3d = mrc.data
         else:
-            logging.info("calculating fast 3DFSC, this will approximately take 1 min and need 30GB RAM")
-            from IsoNet.util.FSC import get_FSC_map, ThreeD_FSC
-            FSC_map = get_FSC_map([half1, half2], mask)
-            fsc3d = ThreeD_FSC(FSC_map)
+            logging.info("calculating fast 3DFSC, this will approximately take x min and need xxGB RAM")
+            if FSC_map is None:
+                FSC_map = get_FSC_map([half1, half2], mask)
+            limit_r = int( (2.*voxel_size) / limit_res * (half1.shape[0]/2.) + 1)
+            fsc3d = ThreeD_FSC(FSC_map, limit_r)
             with mrcfile.new(f"{output_dir}/3DFSC.mrc", overwrite=True) as mrc:
                 mrc.set_data(fsc3d.astype(np.float32))
         logging.info("voxel_size {}".format(voxel_size))

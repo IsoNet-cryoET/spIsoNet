@@ -4,10 +4,10 @@
 import numpy as np
 import mrcfile
 from numpy.fft import fftshift, fftn
-#from scipy.ndimage import zoom
-from skimage.transform import resize
-from scipy.spatial.distance import pdist,squareform
 from multiprocessing import Pool
+import numpy as np
+from scipy.spatial import cKDTree
+from skimage.transform import resize
 
 def get_FSC_map(halfmaps, mask):
     h1 = halfmaps[0] * mask
@@ -32,10 +32,7 @@ def rotational_average(input_map):
         FSC_curve[i] = np.average(input_map[index==i])
     return FSC_curve
 
-import numpy as np
-from scipy.spatial import cKDTree
-from skimage.transform import resize
-from multiprocessing import Pool
+
 
 def calculate_FSC(pixels_T, FSC_values, point_tree, r0):
     values = np.zeros(len(pixels_T[0]))
@@ -43,14 +40,15 @@ def calculate_FSC(pixels_T, FSC_values, point_tree, r0):
         values[j] = np.average(FSC_values[point_tree.query_ball_point(pixel, r0)])
     return values
 
-def ThreeD_FSC(FSC_map, angle=20, resize_to=400, n_processes=16):
-    nz_origional, ny, nx = FSC_map.shape
-
-    FSC_map = resize(FSC_map,[resize_to, resize_to, resize_to])
+def ThreeD_FSC(FSC_map, limit_r=None, angle=20, n_processes=16):
+    nz, ny, nx = FSC_map.shape
+    if limit_r is None:
+        limit_r = nz//2
+    
+    #FSC_map = resize(FSC_map,[resize_to, resize_to, resize_to])
 
     threshold = 2 * np.sin(np.deg2rad(angle) / 2.0)
 
-    nz = resize_to
     r = np.arange(nz) - nz // 2
     [Z,Y,X] = np.meshgrid(r,r,r)
     index = np.round(np.sqrt(Z ** 2 + Y ** 2 + X ** 2))
@@ -61,7 +59,7 @@ def ThreeD_FSC(FSC_map, angle=20, resize_to=400, n_processes=16):
 
     with Pool(processes=n_processes) as pool:
         results = []
-        for i in range(1, nz // 2):
+        for i in range(1, limit_r):
             pixels_T = np.where(index == i)
             pixels = np.transpose(pixels_T)
             point_tree = cKDTree(pixels)
@@ -74,7 +72,7 @@ def ThreeD_FSC(FSC_map, angle=20, resize_to=400, n_processes=16):
             pixels_T = np.where(index == i + 1)
             out[pixels_T] = result.get()
 
-    out = resize(out,[nz_origional, nz_origional, nz_origional])
+    #out = resize(out,[nz_origional, nz_origional, nz_origional])
     return out
 
 if __name__ == '__main__':

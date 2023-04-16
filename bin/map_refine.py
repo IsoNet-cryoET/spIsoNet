@@ -181,11 +181,6 @@ def map_refine(halfmap, mask, fsc3d, threshold, voxel_size, limit_res=None, outp
     #     logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',
     #     datefmt="%m-%d %H:%M:%S",level=logging.INFO,handlers=[logging.StreamHandler(sys.stdout)])
 
-    if limit_res is None:
-        limit_res = recommended_resolution(fsc3d,voxel_size,threshold=0.143)
-        logging.info("Limit resolution to {} for IsoNet missing information recovery. You can also tune this paramerter with --limit_res .".format(limit_res))
-
-
     num_iterations = 9
     data_dir = output_dir+"/data"
     mkfolder(data_dir)
