@@ -1,5 +1,4 @@
 import logging
-from re import I
 from IsoNet.preprocessing.prepare import get_cubes_list,get_noise_level, prepare_first_iter
 from IsoNet.util.dict2attr import save_args_json,load_args_from_json
 import numpy as np
