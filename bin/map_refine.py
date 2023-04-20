@@ -102,9 +102,10 @@ def get_cubes(mw3d, data_dir, crop_size, cube_size, noise_scale, inp):
         data_X = crop_to_size(datax[i], crop_size, cube_size)
         data_Y = crop_to_size(rotated_data[i], crop_size, cube_size)
         noise = crop_to_size(noise_a[i], crop_size, cube_size)
-
-        data_X = data_X + noise* noise_scale
+        
+        # note change order here
         data_Y = data_Y - data_X
+        data_X = data_X + noise* noise_scale
 
         with mrcfile.new('{}/train_x/x_{}.mrc'.format(data_dir, start), overwrite=True) as output_mrc:
             output_mrc.set_data(data_X.astype(np.float32))
@@ -192,7 +193,7 @@ def map_refine(halfmap, mask, fsc3d, threshold, voxel_size, limit_res=None, outp
     network = Net(filter_base = 64)
 
     # need to check normalize
-    halfmap = normalize(halfmap)
+    halfmap = normalize(halfmap,percentile=False)
 
     current_map = halfmap.copy()
     if noise_scale is not None:
@@ -280,9 +281,9 @@ def map_refine_multi(halfmap, mask, fsc3d, voxel_size, limit_res, output_dir = "
             if iter_count > 1:
                 with mrcfile.open(previous_filename, 'r') as mrc:
                     current_map[i] = mrc.data
-                current_map[i] = normalize(current_map[i])
+                current_map[i] = normalize(current_map[i],percentile=False)
             else:
-                halfmap[i] = normalize(halfmap[i])
+                halfmap[i] = normalize(halfmap[i],percentile=False)
                 current_map.append(halfmap[i].copy())
             
                 with mrcfile.new(previous_filename, overwrite=True) as mrc:

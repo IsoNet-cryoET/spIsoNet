@@ -30,14 +30,17 @@ class Train_sets(Dataset):
         return len(self.path_all[0])
 
 class Predict_sets(Dataset):
-    def __init__(self, mrc_list):
+    def __init__(self, mrc_list, inverted=True):
         super(Predict_sets, self).__init__()
         self.mrc_list=mrc_list
+        self.inverted = inverted
 
     def __getitem__(self, idx):
-        rx = mrcfile.open(self.mrc_list[idx]).data[np.newaxis,:,:,:].copy()
+        with mrcfile.open(self.mrc_list[idx]) as mrc:
+            rx = mrc.data[np.newaxis,:,:,:].copy()
         # rx = mrcfile.open(self.mrc_list[idx]).data[:,:,:,np.newaxis]
-        #rx=normalize(rx, percentile = True)
+        if self.inverted:
+            rx=normalize(-rx, percentile = True)
 
         return rx
 

@@ -88,8 +88,9 @@ class DecoderBlock(pl.LightningModule):
         return x
 
 class Unet(pl.LightningModule):
-    def __init__(self,filter_base = 64, metrics=None):
+    def __init__(self,filter_base = 64, add_last=False, metrics=None):
         super(Unet, self).__init__()
+        self.add_last = add_last
         if filter_base == 64:
             filter_base = [64,128,256,320,320,320]
         elif filter_base == 32:
@@ -135,6 +136,8 @@ class Unet(pl.LightningModule):
             x, down_sampling_features = self.encoder(x)
             x = self.decoder(x, down_sampling_features)
             y_hat = self.final(x)
+            if self.add_last:
+                y_hat += x_org
             return y_hat
 
     def training_step(self, batch, batch_idx):

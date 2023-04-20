@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import os, sys
-from IsoNet.util.image import *
+#from IsoNet.util.image import *
 from IsoNet.util.metadata import MetaData,Label,Item
 from IsoNet.util.dict2attr import idx2list
 import logging
@@ -15,7 +15,8 @@ def predict(args):
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',
         datefmt="%m-%d %H:%M:%S",level=logging.INFO,handlers=[logging.StreamHandler(sys.stdout)])
     logging.info('\n\n######Isonet starts predicting######\n')
-
+    if args.gpuID is None:
+        raise ValueError("Please provide gpuID")
     args.gpuID = str(args.gpuID)
     args.ngpus = len(list(set(args.gpuID.split(','))))
     os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"

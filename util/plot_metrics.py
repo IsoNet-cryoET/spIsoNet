@@ -23,3 +23,4 @@ def plot_metrics(metrics, filename):
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     plt.xlabel("epochs")
     plt.savefig(filename)
+    plt.close()

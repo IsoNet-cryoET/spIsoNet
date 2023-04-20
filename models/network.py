@@ -12,12 +12,9 @@ import logging
 from IsoNet.util.toTile import reform3D
 import sys
 from tqdm import tqdm
-from IsoNet.preprocessing.simulate import apply_wedge_dcube
-from IsoNet.preprocessing.simulate import apply_wedge
-
 class Net:
-    def __init__(self,filter_base=64, metrics=None):
-        self.model = Unet(filter_base = filter_base, metrics=metrics)
+    def __init__(self,filter_base=64, add_last=False, metrics=None):
+        self.model = Unet(filter_base = filter_base, add_last=add_last, metrics=metrics)
 
 
     def load(self, path):
@@ -42,28 +39,28 @@ class Net:
         acc_grad = True
         train_batches = int(steps_per_epoch*0.9)
         val_batches = steps_per_epoch - train_batches
+        acc_batches = 8
         if acc_grad:
             logging.info("use accumulate gradient to reduce GPU memory consumption")
-            batch_size = batch_size//2
-            acc_batches = 2
-            train_batches = train_batches * 2
-            val_batches = val_batches * 2
+            batch_size = batch_size//acc_batches
+            train_batches = train_batches * acc_batches
+            val_batches = val_batches * acc_batches
         else:
             acc_batches = 1
-
+        #torch.multiprocessing.set_sharing_strategy('file_system')
         train_dataset, val_dataset = get_datasets(data_path)
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True,persistent_workers=True,
-                                                num_workers=ncpus, pin_memory=True, drop_last=True)
+                                                num_workers=ncpus//2, pin_memory=True, drop_last=True)
 
         val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True,persistent_workers=True,
-                                                pin_memory=True, num_workers=ncpus, drop_last=True)
+                                                pin_memory=True, num_workers=ncpus//2, drop_last=True)
 
         self.model.train()
 
         trainer = pl.Trainer(
             accumulate_grad_batches=acc_batches,
             accelerator='gpu',
-            precision=16,
+            precision=32,
             #devices=gpuID,
             num_nodes=1,
             max_epochs=epochs,
@@ -79,9 +76,9 @@ class Net:
         trainer.fit(self.model, train_loader, val_loader)        
         return  self.model.metrics
 
-    def predict(self, mrc_list, result_dir, iter_count, mw3d=None):    
+    def predict(self, mrc_list, result_dir, iter_count, inverted=True, mw3d=None):    
 
-        bench_dataset = Predict_sets(mrc_list)
+        bench_dataset = Predict_sets(mrc_list, inverted=inverted)
         bench_loader = torch.utils.data.DataLoader(bench_dataset, batch_size=4, num_workers=1)
 
         model = torch.nn.DataParallel(self.model.cuda())
@@ -101,11 +98,11 @@ class Net:
             #outData = normalize(predicted[i], percentile = normalize_percentile)
             file_name = '{}/{}_iter{:0>2d}.mrc'.format(result_dir, root_name, iter_count-1)
  
-            output_data = predicted[i]
-            if mw3d is not None:
-                with mrcfile.open(mrc, 'r') as origional_mrc:
-                    input_data= origional_mrc.data
-                output_data = apply_wedge(output_data, mw3d=mw3d, ld1=0, ld2=1) + input_data#+ apply_wedge(input_data, mw3d=mw3d, ld1=1, ld2=0) 
+            output_data = -predicted[i]
+            # if mw3d is not None:
+            #     with mrcfile.open(mrc, 'r') as origional_mrc:
+            #         input_data= origional_mrc.data
+            #     output_data = apply_wedge(output_data, mw3d=mw3d, ld1=0, ld2=1) + input_data#+ apply_wedge(input_data, mw3d=mw3d, ld1=1, ld2=0) 
 
 
             with mrcfile.new(file_name, overwrite=True) as output_mrc:

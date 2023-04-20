@@ -120,17 +120,20 @@ def get_cubes(inp,settings):
     root_name = mrc.split('/')[-1].split('.')[0]
     current_mrc = '{}/{}_iter{:0>2d}.mrc'.format(settings.result_dir,root_name,settings.iter_count-1)
     with mrcfile.open(mrc) as mrcData:
-        iw_data = mrcData.data.astype(np.float32)
-    #iw_data = normalize(iw_data, percentile = settings.normalize_percentile)
+        iw_data = mrcData.data.astype(np.float32) * -1
+    iw_data = normalize(iw_data, percentile = settings.normalize_percentile)
 
     with mrcfile.open(current_mrc) as mrcData:
-        ow_data = mrcData.data.astype(np.float32)
-    #ow_data = normalize(ow_data, percentile = settings.normalize_percentile)
-    orig_data = apply_wedge(ow_data, ld1=0, ld2=1) + iw_data    #apply_wedge(iw_data, ld1=1, ld2=0)
-    #orig_data = normalize(orig_data, percentile = settings.normalize_percentile)
+        ow_data = mrcData.data.astype(np.float32) * -1
+    ow_data = normalize(ow_data, percentile = settings.normalize_percentile)
+
+    #the following line should be tested again
+    orig_data = apply_wedge(ow_data, ld1=0, ld2=1) + apply_wedge(iw_data, ld1=1, ld2=0) #iw_data    #apply_wedge(iw_data, ld1=1, ld2=0)
+    
+    orig_data = normalize(orig_data, percentile = settings.normalize_percentile)
 
     rotated_data = np.zeros((len(rotation_list), *orig_data.shape))
-    mw = mw2D(settings.crop_size)  
+  
     old_rotation = True
     if old_rotation:
         for i,r in enumerate(rotation_list):
@@ -146,6 +149,7 @@ def get_cubes(inp,settings):
             offset = center-np.dot(rot,center)
             rotated_data[i] = affine_transform(orig_data,rot,offset=offset)
     
+    mw = mw2D(settings.crop_size)
     datax = apply_wedge_dcube(rotated_data, mw)
 
     for i in range(len(rotation_list)): 
@@ -212,7 +216,7 @@ def generate_first_iter_mrc(mrc,settings):
     extension = mrc.split('/')[-1].split('.')[1]
     with mrcfile.open(mrc) as mrcData:
     #    orig_data = normalize(mrcData.data.astype(np.float32), percentile = settings.normalize_percentile)
-         orig_data = mrcData.data.astype(np.float32)
+         orig_data = mrcData.data.astype(np.float32)*-1
 
     #orig_data = apply_wedge(orig_data, ld1=1, ld2=0)
     
@@ -224,7 +228,7 @@ def generate_first_iter_mrc(mrc,settings):
 
     orig_data = normalize(orig_data, percentile = settings.normalize_percentile)
     with mrcfile.new('{}/{}_iter00.{}'.format(settings.result_dir,root_name, extension), overwrite=True) as output_mrc:
-        output_mrc.set_data(orig_data)
+        output_mrc.set_data(-orig_data)
 
 def prepare_first_iter(settings):
     if settings.ncpus >1:
