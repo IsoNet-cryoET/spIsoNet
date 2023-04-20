@@ -3,26 +3,7 @@ import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 import logging
-def apply_wedge_dcube_torch(ori_data, mw2d = None, mw3d=None, ld1 = 1, ld2 = 0):
 
-    #import mrcfile
-    #with mrcfile.open(mw3d, 'r') as mrc:
-    #    mw = mrc.data.copy()
-    #mw[mw<0.5] = 0
-    #mw[mw>=0.5] = 1
-    #mw = np.sqrt((2*mw)/(1+mw))
-    mw = mw3d
-    mw = mw*ld1 + (1-mw) * ld2
-    mwshift = torch.fft.fftshift(mw)
-    data = torch.zeros_like(ori_data)
-    for i,d in enumerate(ori_data):
-        f_data = torch.fft.fftn(d)
-        outData = mwshift*f_data
-        inv = torch.fft.ifftn(outData)
-        data[i] = torch.real(inv)
-        #data[i] = normalize(data[i],percentile=True)
-
-    return data
 class ConvBlock(pl.LightningModule):
     # conv_per_depth fixed to 2
     def __init__(self, in_channels, out_channels, n_conv, kernel_size =3, stride=1, padding=1):

@@ -42,7 +42,6 @@ def extract_subtomos(settings):
                 with mrcfile.open(it.rlnMicrographName) as mrcData:
                     orig_data = mrcData.data.astype(np.float32)
             
-            orig_data = normalize(orig_data)
             if "rlnMaskName" in md.getLabels() and it.rlnMaskName not in [None, "None"]:
                 with mrcfile.open(it.rlnMaskName) as m:
                     mask_data = m.data
@@ -215,10 +214,9 @@ def generate_first_iter_mrc(mrc,settings):
     root_name = mrc.split('/')[-1].split('.')[0]
     extension = mrc.split('/')[-1].split('.')[1]
     with mrcfile.open(mrc) as mrcData:
-    #    orig_data = normalize(mrcData.data.astype(np.float32), percentile = settings.normalize_percentile)
-         orig_data = mrcData.data.astype(np.float32)*-1
+        orig_data = normalize(mrcData.data.astype(np.float32)*-1, percentile = settings.normalize_percentile)
 
-    #orig_data = apply_wedge(orig_data, ld1=1, ld2=0)
+    orig_data = apply_wedge(orig_data, ld1=1, ld2=0)
     
     #prefill = True
     if settings.prefill==True:

@@ -98,15 +98,8 @@ class Net:
             #outData = normalize(predicted[i], percentile = normalize_percentile)
             file_name = '{}/{}_iter{:0>2d}.mrc'.format(result_dir, root_name, iter_count-1)
  
-            output_data = -predicted[i]
-            # if mw3d is not None:
-            #     with mrcfile.open(mrc, 'r') as origional_mrc:
-            #         input_data= origional_mrc.data
-            #     output_data = apply_wedge(output_data, mw3d=mw3d, ld1=0, ld2=1) + input_data#+ apply_wedge(input_data, mw3d=mw3d, ld1=1, ld2=0) 
-
-
             with mrcfile.new(file_name, overwrite=True) as output_mrc:
-                output_mrc.set_data(output_data)
+                output_mrc.set_data(-predicted[i])
     
     def predict_tomo(self, args, one_tomo, output_file=None):
     #predict one tomogram in mrc format INPUT: mrc_file string OUTPUT: output_file(str) or <root_name>_corrected.mrc
@@ -122,7 +115,7 @@ class Net:
         logging.info('predicting:{}'.format(root_name))
 
         with mrcfile.open(one_tomo) as mrcData:
-            real_data = mrcData.data.astype(np.float32)
+            real_data = mrcData.data.astype(np.float32)*-1
             voxelsize = mrcData.voxel_size
 
         real_data = normalize(real_data,percentile=args.normalize_percentile)
@@ -149,19 +142,15 @@ class Net:
             for i in tqdm(range(num_big_batch), file=sys.stdout):#track(range(num_big_batch), description="Processing..."):
                 in_data = torch.from_numpy(np.transpose(data[i*N:(i+1)*N],(0,4,1,2,3)))
                 output = model(in_data)
-                out_tmp = output.cpu().detach().numpy().astype(np.float32)
-                #out_tmp = apply_wedge_dcube(out_tmp,ld1=0, ld2=1)
-
-                out_tmp = np.transpose(out_tmp, (0,2,3,4,1) )
-                outData[i*N:(i+1)*N] = out_tmp#  + data[i*N:(i+1)*N]
+                outData[i*N:(i+1)*N] = np.transpose(output.cpu().detach().numpy().astype(np.float32), (0,2,3,4,1) )
 
         outData = outData[0:num_patches]
 
         outData=reform_ins.restore_from_cubes_new(outData.reshape(outData.shape[0:-1]), args.cube_size, args.crop_size)
 
-        #outData = normalize(outData,percentile=args.normalize_percentile)
+        outData = normalize(outData,percentile=args.normalize_percentile)
         with mrcfile.new(output_file, overwrite=True) as output_mrc:
-            output_mrc.set_data(outData.astype(np.float32))
+            output_mrc.set_data(-outData)
             output_mrc.voxel_size = voxelsize
 
         logging.info('Done predicting')
