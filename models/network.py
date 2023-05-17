@@ -13,8 +13,8 @@ from IsoNet.util.toTile import reform3D
 import sys
 from tqdm import tqdm
 class Net:
-    def __init__(self,filter_base=64, add_last=False, metrics=None):
-        self.model = Unet(filter_base = filter_base, add_last=add_last, metrics=metrics)
+    def __init__(self,filter_base=64, learning_rate = 3e-4, add_last=False, metrics=None):
+        self.model = Unet(filter_base = filter_base,learning_rate=learning_rate, add_last=add_last, metrics=metrics)
 
 
     def load(self, path):
@@ -33,20 +33,21 @@ class Net:
         model_scripted = torch.jit.script(self.model) # Export to TorchScript
         model_scripted.save(path) # Save
 
-    def train(self, data_path, gpuID=[0,1,2,3], learning_rate=3e-4, batch_size=None, epochs = 10, steps_per_epoch=200, acc_grad =False, ncpus=8):
+    def train(self, data_path, gpuID=[0,1,2,3], learning_rate=3e-4, batch_size=None, 
+              epochs = 10, steps_per_epoch=200, acc_batches =2,
+              ncpus=8, precision=32):
         self.model.learning_rate = learning_rate
         print(batch_size)
-        acc_grad = True
+        #acc_grad = True
         train_batches = int(steps_per_epoch*0.9)
         val_batches = steps_per_epoch - train_batches
-        acc_batches = 8
-        if acc_grad:
+        #acc_batches = 4
+        if acc_batches > 1:
             logging.info("use accumulate gradient to reduce GPU memory consumption")
             batch_size = batch_size//acc_batches
             train_batches = train_batches * acc_batches
             val_batches = val_batches * acc_batches
-        else:
-            acc_batches = 1
+
         #torch.multiprocessing.set_sharing_strategy('file_system')
         train_dataset, val_dataset = get_datasets(data_path)
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True,persistent_workers=True,
@@ -60,7 +61,7 @@ class Net:
         trainer = pl.Trainer(
             accumulate_grad_batches=acc_batches,
             accelerator='gpu',
-            precision=32,
+            precision=precision,
             #devices=gpuID,
             num_nodes=1,
             max_epochs=epochs,
@@ -155,13 +156,21 @@ class Net:
 
         logging.info('Done predicting')
     
-    def predict_map(self, halfmap,halfmap_origional,fsc3d_full, fsc3d, output_file, cube_size = 64, crop_size=96, batch_size = 4, voxel_size = 1.1):
+    def predict_map(self, halfmap,halfmap_origional,mask,fsc3d_full, fsc3d, output_file, cube_size = 64, crop_size=96, batch_size = 4, voxel_size = 1.1):
     #predict one tomogram in mrc format INPUT: mrc_file string OUTPUT: output_file(str) or <root_name>_corrected.mrc
 
 
-        logging.info('Inference')
+        #logging.info('Inference')
+        #pad_width = 16
+        #real_data = np.pad(halfmap, pad_width, mode='edge')
 
-        real_data = halfmap
+        real_data = halfmap.copy()
+        d = real_data.shape[0]
+        r = np.arange(d)-d//2
+        [Z,Y,X] = np.meshgrid(r,r,r)
+        index = np.round(np.sqrt(Z**2+Y**2+X**2))
+        real_data[index>r] = halfmap_origional[index>r]
+
         data=np.expand_dims(real_data,axis=-1)
         reform_ins = reform3D(data)
         data = reform_ins.pad_and_crop_new(cube_size,crop_size)
@@ -200,20 +209,33 @@ class Net:
         outData = outData[0:num_patches]
 
         outData=reform_ins.restore_from_cubes_new(outData.reshape(outData.shape[0:-1]), cube_size, crop_size)
-        print(np.std(outData))
+
+        #outData = outData[pad_width:-pad_width,pad_width:-pad_width,pad_width:-pad_width]
+        with mrcfile.new(output_file[2], overwrite=True) as output_mrc:
+            output_mrc.set_data((outData).astype(np.float32))
+            output_mrc.voxel_size = voxel_size
         #outData = apply_wedge(normalize(outData),mw3d=fsc3d_full, ld1=0, ld2=1)
         
         #outData = apply_wedge(outData,mw3d=fsc3d_full, ld1=0, ld2=1)
+
         print(np.std(outData))
-        outData += halfmap_origional# apply_wedge(normalize(halfmap),mw3d=fsc3d_full, ld1=1, ld2=0) #0.5*real_data#
+        diff_map = (outData - halfmap)#*mask
+        print('diff_sd', np.std(diff_map))
+        outData = diff_map + halfmap_origional# apply_wedge(normalize(halfmap),mw3d=fsc3d_full, ld1=1, ld2=0) #0.5*real_data#
         #outData += apply_wedge(halfmap_origional,mw3d=fsc3d_full, ld1=1, ld2=0)
         print(np.std(outData))
-        print(np.std(real_data))
+        print(np.std(halfmap))
+        print(np.std(halfmap_origional))
+
 
         #outData = normalize(outData,percentile=args.normalize_percentile)
-        with mrcfile.new(output_file, overwrite=True) as output_mrc:
+        with mrcfile.new(output_file[0], overwrite=True) as output_mrc:
             output_mrc.set_data(outData.astype(np.float32))
             output_mrc.voxel_size = voxel_size
+        with mrcfile.new(output_file[1], overwrite=True) as output_mrc:
+            output_mrc.set_data(halfmap.astype(np.float32))
+            output_mrc.voxel_size = voxel_size
+
 
 
         logging.info('Done predicting')

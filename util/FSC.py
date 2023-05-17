@@ -37,7 +37,7 @@ def rotational_average(input_map):
 def calculate_FSC(pixels_T, FSC_values, point_tree, r0):
     values = np.zeros(len(pixels_T[0]))
     for j, pixel in enumerate(zip(pixels_T[0], pixels_T[1], pixels_T[2])):
-        values[j] = np.average(FSC_values[point_tree.query_ball_point(pixel, r0)])
+        values[j] = (FSC_values[point_tree.query_ball_point(pixel, r0)]).mean()
     return values
 
 def ThreeD_FSC(FSC_map, limit_r=None, angle=20, n_processes=16):
@@ -78,7 +78,7 @@ def ThreeD_FSC(FSC_map, limit_r=None, angle=20, n_processes=16):
 if __name__ == '__main__':
         
     fNHalfMap1='emd_8731_half_map_1.mrc'
-    fNHalfMap2='emd_8731_half_map_2.mrc'
+    fNHalfMap2='emd_8731_half_map_2.mrc' 
 
     halfmaps = []
     with mrcfile.open(fNHalfMap1,'r') as mrc:

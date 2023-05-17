@@ -12,15 +12,15 @@ class ConvBlock(pl.LightningModule):
             nn.Conv3d(in_channels=in_channels, out_channels=out_channels,
                     kernel_size=kernel_size, stride=stride, padding=padding, bias=True), 
             #nn.InstanceNorm3d(num_features = out_channels),
-            nn.LeakyReLU(),
             nn.BatchNorm3d(num_features=out_channels),
+            nn.LeakyReLU(),
         ]
         for _ in range(max(n_conv-1,0)):
             layers.append(nn.Conv3d(in_channels=out_channels, out_channels=out_channels,
                     kernel_size=kernel_size, stride=stride, padding=padding, bias=True))
             #layers.append(nn.InstanceNorm3d(num_features=out_channels))
-            layers.append(nn.LeakyReLU())
             layers.append(nn.BatchNorm3d(num_features=out_channels))
+            layers.append(nn.LeakyReLU())
 
         self.net = nn.Sequential(*layers)
 
@@ -69,7 +69,7 @@ class DecoderBlock(pl.LightningModule):
         return x
 
 class Unet(pl.LightningModule):
-    def __init__(self,filter_base = 64, add_last=False, metrics=None):
+    def __init__(self,filter_base = 64, learning_rate = 3e-4, add_last=False, metrics=None):
         super(Unet, self).__init__()
         self.add_last = add_last
         if filter_base == 64:
@@ -98,7 +98,7 @@ class Unet(pl.LightningModule):
             )
         
 
-        self.learning_rate = None#3e-4
+        self.learning_rate = learning_rate
         if metrics is None:
             self.metrics = {'train_loss':[], 'val_loss':[]}
         else:
