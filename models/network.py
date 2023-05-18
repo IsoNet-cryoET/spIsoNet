@@ -37,8 +37,8 @@ class Net:
               epochs = 10, steps_per_epoch=200, acc_batches =2,
               ncpus=8, precision=32):
         #self.model.learning_rate = learning_rate
-        print(batch_size)
-        print('acc_batches',acc_batches)
+        #print(batch_size)
+        #print('acc_batches',acc_batches)
         #acc_grad = True
         train_batches = int(steps_per_epoch*0.9)
         val_batches = steps_per_epoch - train_batches
@@ -219,14 +219,14 @@ class Net:
         
         #outData = apply_wedge(outData,mw3d=fsc3d_full, ld1=0, ld2=1)
 
-        print(np.std(outData))
+        # print(np.std(outData))
         diff_map = (outData - halfmap)#*mask
-        print('diff_sd', np.std(diff_map))
+        # print('diff_sd', np.std(diff_map))
         outData = diff_map + halfmap_origional# apply_wedge(normalize(halfmap),mw3d=fsc3d_full, ld1=1, ld2=0) #0.5*real_data#
         #outData += apply_wedge(halfmap_origional,mw3d=fsc3d_full, ld1=1, ld2=0)
-        print(np.std(outData))
-        print(np.std(halfmap))
-        print(np.std(halfmap_origional))
+        # print(np.std(outData))
+        # print(np.std(halfmap))
+        # print(np.std(halfmap_origional))
 
 
         #outData = normalize(outData,percentile=args.normalize_percentile)

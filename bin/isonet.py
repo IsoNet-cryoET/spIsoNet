@@ -318,7 +318,7 @@ class ISONET:
         pretrained_model: str = None,
         log_level: str = None,
         result_dir: str='results',
-        remove_intermediate: bool =False,
+        remove_intermediate: bool =True,
         select_subtomo_number: int = None,
         ncpus: int = 16,
         continue_from: str=None,
@@ -335,7 +335,7 @@ class ISONET:
         normalize_percentile: bool = True,
 
         prefill: bool = False,
-        low_mem: bool = False
+        acc_batches: int = 1
 
     ):
         """
@@ -368,6 +368,7 @@ class ISONET:
 
         :param learning_rate: (0.0004) learning rate for network training.
         :param normalize_percentile: (True) Normalize the 5 percent and 95 percent pixel intensity to 0 and 1 respectively. If this is set to False, normalize the input to 0 mean and 1 standard dievation.
+        :param acc_batches: If this value is set to 2 (or more), accumulate gradiant will be used to save memory consumption.  
         """
         from IsoNet.bin.refine import run
         d = locals()
@@ -376,25 +377,59 @@ class ISONET:
             f.write(' '.join(sys.argv[0:]) + '\n')
         run(d_args)
 
-    def map_refine(self, half1_file, half2_file, mask_file, 
-                   gpuID=0, ncpus=16, output_dir="isonet_maps", limit_res=None, fsc_file=None, 
-                   iterations=10, threshold=None, n_subvolume=50, crop_size=96, cube_size=64,
-                   epoches =10, half_precision=True,
-                   batch_size=None, acc_batches=2):
+    def map_refine(self, 
+                   i: str,
+                   i2: str, 
+                   mask_file: str, 
+                   gpuID: int=0, 
+                   ncpus: int=16, 
+                   output_dir: str="isonet_maps", 
+                   limit_res: float=None, 
+                   fsc_file: str=None, 
+                   iterations: int=10,
+                   threshold: float=None, 
+                   n_subvolume: int=50, 
+                   crop_size: int=96, 
+                   cube_size: int=64,
+                   epoches: int=10, 
+                   single_precision: bool=False,
+                   batch_size: int=None, 
+                   acc_batches: int=1):
 
         """
         \ntrain neural network to correct preffered orientation\n
-        isonet.py map_refine half1_file half2_file mask_file [--gpuID] [--ncpus] ...
+        isonet.py map_refine half1.mrc half2.mrc mask.mrc [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
+        :param i: Input name of half1
+        :param i2: Input name of half2
+        :param mask_file: Filename of a user-provided mask
+        :param gpuID: The ID of gpu to be used during the training.
+        :param ncpus: Number of cpu for preprocessing.
+        :param output_dir: The name of directory to save output maps
+        :param limit_res: The resolution limit for recovery, default is the resolution of the map.
+        :param fsc_file: 3DFSC file 
+        :param iterations: Number of iterations.
+        :param threshold: Threshold to make 3DFSC volume binary. We usuallly do not use it.  
+        :param n_subvolume: Number of subvolumes 
+        :param crop_size: The size of subvolumes, should be larger then the cube_size
+        :param cube_size: Size of cubes for training, should be divisible by 8, eg. 32, 64.
+        :param single_precision: If this is False, use half precision to speed up and reduce GPU memory consumption
+        :param batch_size: Size of the minibatch. If None, batch_size will be the max(2 * number_of_gpu,4). batch_size should be divisible by the number of gpu.
+        :param acc_batches: If this value is set to 2 (or more), accumulate gradiant will be used to save memory consumption.  
         """
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
             ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])     
         
 
         gpuID = str(gpuID).split(',')
-        if len(gpuID) == 1 or len(gpuID) == 2:
-            batch_size = 8
+        if len(gpuID) == 1:
+            batch_size = 4
         else:
             batch_size = 2 * len(gpuID)
+
+        if single_precision:
+            precision = 32
+        else:
+            precision = 16
         from IsoNet.util.utils import mkfolder
         from IsoNet.preprocessing.img_processing import normalize
 
@@ -402,10 +437,10 @@ class ISONET:
         
         import mrcfile
         import numpy as np
-        with mrcfile.open(half1_file, 'r') as mrc:
+        with mrcfile.open(i, 'r') as mrc:
             half1 = normalize(mrc.data,percentile=False)
             voxel_size = mrc.voxel_size.x
-        with mrcfile.open(half2_file, 'r') as mrc:
+        with mrcfile.open(i2, 'r') as mrc:
             half2 = normalize(mrc.data,percentile=False)
         with mrcfile.open(mask_file, 'r') as mrc:
             mask = mrc.data
@@ -442,12 +477,6 @@ class ISONET:
         noise_scale = np.std(diff_map[mask>0])/1.414
         logging.info(f"noise_scale: {noise_scale}")
 
-
-        if half_precision:
-            precision = 16
-        else:
-            precision = 32
-
         logging.info("processing half map1")
         map_refine(half1, mask, fsc3d, threshold=threshold, voxel_size=voxel_size, output_dir=output_dir, 
                    output_base="half1",  limit_res=limit_res, iterations=iterations, precision=precision, epoches = epoches,
@@ -472,6 +501,7 @@ class ISONET:
 
         logging.info("Two independent half maps are saved in {}. Please use other software for postprocessing and try difference B factors".format(output_dir))
 
+    '''
     def map_refine_multi(self, half1_file, half2_file, mask_file, fsc_file, limit_res, output_dir="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, weighting=False):
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
             ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])
@@ -504,7 +534,7 @@ class ISONET:
         logging.info("processing half map2")
         map_refine_multi(half2, mask, fsc3d, voxel_size=voxel_size, limit_res = limit_res, output_dir = output_dir, output_base="half2", weighting = weighting, n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size)
         logging.info("Two independent half maps are saved in {}. Please use other software for postprocessing and try difference B factors".format(output_dir))
-
+    '''
 
     def predict(self, star_file: str, model: str, output_dir: str='./corrected_tomos', gpuID: str = None, cube_size:int=64,
     crop_size:int=96,use_deconv_tomo=True, batch_size:int=None,normalize_percentile: bool=True,log_level: str="info", tomo_idx=None):

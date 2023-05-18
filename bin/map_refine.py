@@ -189,11 +189,11 @@ def map_refine(halfmap, mask, fsc3d, threshold, voxel_size, limit_res=None,
     data_dir = output_dir+"/data"
     mkfolder(data_dir)
     fsc3d_cube = rescale_fsc(fsc3d, threshold, voxel_size, limit_res, crop_size)
-    with mrcfile.new('small_FSC.mrc', overwrite=True) as mrc:
-        mrc.set_data(fsc3d_cube)
+    # with mrcfile.new('small_FSC.mrc', overwrite=True) as mrc:
+    #     mrc.set_data(fsc3d_cube)
     fsc3d_full = rescale_fsc(fsc3d, threshold, voxel_size, limit_res, halfmap.shape[0])
-    with mrcfile.new('large_FSC.mrc', overwrite=True) as mrc:
-        mrc.set_data(fsc3d_full)
+    # with mrcfile.new('large_FSC.mrc', overwrite=True) as mrc:
+    #     mrc.set_data(fsc3d_full)
 
 
     from IsoNet.models.network import Net
