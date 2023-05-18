@@ -377,42 +377,24 @@ class ISONET:
         run(d_args)
 
     def map_refine(self, half1_file, half2_file, mask_file, 
-                   fsc_file=None, iterations=10, threshold=None, limit_res=None, output_dir="isonet_maps", 
-                   gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, ncpus=16):
+                   gpuID=0, ncpus=16, output_dir="isonet_maps", limit_res=None, fsc_file=None, 
+                   iterations=10, threshold=None, n_subvolume=50, crop_size=96, cube_size=64,
+                   epoches =10, half_precision=True,
+                   batch_size=None, acc_batches=2):
 
         """
-        \ntrain neural network to correct missing wedge\n
-        isonet.py refine subtomo_star [--iterations] [--gpuID] [--preprocessing_ncpus] [--batch_size] [--steps_per_epoch] [--noise_start_iter] [--noise_level]...
-        :param subtomo_star: (None) star file containing subtomogram(s).
-        :param gpuID: (0,1,2,3) The ID of gpu to be used during the training. e.g 0,1,2,3.
-        :param pretrained_model: (None) A trained neural network model in ".h5" format to start with.
-        :param iterations: (30) Number of training iterations.
-        :param data_dir: (data) Temperary folder to save the generated data used for training.
-        :param log_level: (info) debug level, could be 'info' or 'debug'
-        :param continue_from: (None) A Json file to continue from. That json file is generated at each iteration of refine.
-        :param result_dir: ('results') The name of directory to save refined neural network models and subtomograms
-        :param ncpus: (16) Number of cpu for preprocessing.
-
-        ************************Training settings************************
-
-        :param epochs: (10) Number of epoch for each iteraction.
-        :param batch_size: (None) Size of the minibatch.If None, batch_size will be the max(2 * number_of_gpu,4). batch_size should be divisible by the number of gpu.
-        :param steps_per_epoch: (None) Step per epoch. If not defined, the default value will be min(num_of_subtomograms * 8 / batch_size , 200)
-
-        ************************Denoise settings************************
-
-        :param noise_level: (0.05,0.1,0.15,0.2) Level of noise STD(added noise)/STD(data) after the iteration defined in noise_start_iter.
-        :param noise_start_iter: (11,16,21,26) Iteration that start to add noise of corresponding noise level.
-        :param noise_mode: (None) Filter names when generating noise volumes, can be 'ramp', 'hamming' and 'noFilter'
-        :param noise_dir: (None) Directory for generated noise volumes. If set to None, the Noise volumes should appear in results/training_noise
-
-        ************************Network settings************************
-
-        :param learning_rate: (0.0004) learning rate for network training.
-        :param normalize_percentile: (True) Normalize the 5 percent and 95 percent pixel intensity to 0 and 1 respectively. If this is set to False, normalize the input to 0 mean and 1 standard dievation.
+        \ntrain neural network to correct preffered orientation\n
+        isonet.py map_refine half1_file half2_file mask_file [--gpuID] [--ncpus] ...
         """
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
             ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])     
+        
+
+        gpuID = str(gpuID).split(',')
+        if len(gpuID) == 1 or len(gpuID) == 2:
+            batch_size = 8
+        else:
+            batch_size = 2 * len(gpuID)
         from IsoNet.util.utils import mkfolder
         from IsoNet.preprocessing.img_processing import normalize
 
@@ -437,8 +419,6 @@ class ISONET:
             logging.info("Global resolution at FSC={} is {}".format(0.143, limit_res))
         else:
             FSC_map = None
-        #if limit_res is None:
-        #    limit_res = 2*voxel_size
 
         logging.info("Limit resolution to {} for IsoNet missing information recovery. \
                      You can also tune this paramerter with --limit_res .".format(limit_res))
@@ -461,16 +441,35 @@ class ISONET:
         diff_map = half1-half2
         noise_scale = np.std(diff_map[mask>0])/1.414
         logging.info(f"noise_scale: {noise_scale}")
-        #noise_scale=None
+
+
+        if half_precision:
+            precision = 16
+        else:
+            precision = 32
 
         logging.info("processing half map1")
         map_refine(half1, mask, fsc3d, threshold=threshold, voxel_size=voxel_size, output_dir=output_dir, 
-                   output_base="half1",  limit_res=limit_res, iterations=iterations,
-                   n_subvolume=n_subvolume, cube_size=cube_size, crop_size=crop_size, noise_scale=noise_scale)
+                   output_base="half1",  limit_res=limit_res, iterations=iterations, precision=precision, epoches = epoches,
+                   n_subvolume=n_subvolume, cube_size=cube_size, crop_size=crop_size, noise_scale=noise_scale,
+                   batch_size = batch_size, acc_batches = acc_batches,gpuID=gpuID)
         logging.info("processing half map2")
         map_refine(half2, mask, fsc3d, threshold=threshold, voxel_size=voxel_size, output_dir=output_dir,
-                    output_base="half2", limit_res = limit_res, iterations=iterations,
-                    n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size, noise_scale=noise_scale)
+                    output_base="half2", limit_res = limit_res, iterations=iterations, precision=precision, epoches = epoches,
+                   n_subvolume=n_subvolume, cube_size=cube_size, crop_size=crop_size, noise_scale=noise_scale,
+                   batch_size = batch_size, acc_batches = acc_batches,gpuID=gpuID)
+        
+        logging.info("removing intermediate files")
+        files = os.listdir(output_dir)
+        import shutil
+        for item in files:
+            if item == "data" or item == "data~":
+                path = f'{output_dir}/{item}'
+                shutil.rmtree(path)
+            if item.startswith('subvolume'):
+                path = f'{output_dir}/{item}'
+                os.remove(path)
+
         logging.info("Two independent half maps are saved in {}. Please use other software for postprocessing and try difference B factors".format(output_dir))
 
     def map_refine_multi(self, half1_file, half2_file, mask_file, fsc_file, limit_res, output_dir="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, weighting=False):

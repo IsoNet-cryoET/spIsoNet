@@ -182,16 +182,9 @@ def extract_subvolume(current_map, n_subvolume, crop_size, mask, output_dir, pre
 
 
 def map_refine(halfmap, mask, fsc3d, threshold, voxel_size, limit_res=None, 
-               iterations = 20,
+               iterations = 10, epoches = 10, precision = 16,
                output_dir = "results", output_base="half1", n_subvolume = 50, 
-               cube_size = 64, crop_size = 96, noise_scale=None):
-    # log_level = "info"
-    # if log_level == "debug":
-    #     logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
-    #     datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])
-    # else:
-    #     logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',
-    #     datefmt="%m-%d %H:%M:%S",level=logging.INFO,handlers=[logging.StreamHandler(sys.stdout)])
+               cube_size = 64, crop_size = 96, noise_scale=None, batch_size = 8, acc_batches=2, gpuID=0):
 
     data_dir = output_dir+"/data"
     mkfolder(data_dir)
@@ -204,16 +197,13 @@ def map_refine(halfmap, mask, fsc3d, threshold, voxel_size, limit_res=None,
 
 
     from IsoNet.models.network import Net
-    network = Net(filter_base = 64,learning_rate=4e-4,add_last=True)
+    network = Net(filter_base = 64, learning_rate=3e-4, add_last=True)
 
     # need to check normalize
     halfmap = normalize(halfmap,percentile=False)
 
     current_map = halfmap.copy()
-    #if noise_scale is None:
-    #    noise_scale=np.std(current_map[mask>0.1])*0.2
-    #print('singlemap noise',np.std(current_map[mask>0.1])*0.2)
-    #main iterations
+
     for iter_count in range(0,iterations+1):
         
         if iter_count == 0:
@@ -236,14 +226,14 @@ def map_refine(halfmap, mask, fsc3d, threshold, voxel_size, limit_res=None,
 
         logging.info("Start preparing subvolumes!")
         get_cubes_list(fsc3d_cube, mrc_list, data_dir, output_dir, crop_size, cube_size, noise_scale)
-        split_train_test(data_dir,batch_size=8)
+        split_train_test(data_dir,batch_size=batch_size)
         logging.info("Done preparing subvolumes!")
 
 
         logging.info("Start training!")
 
-        metrics = network.train(data_dir,gpuID=0, batch_size=8, epochs = 5, steps_per_epoch = 200, 
-                                precision=16, acc_batches=2) #train based on init model and save new one as model_iter{num_iter}.h5
+        metrics = network.train(data_dir,gpuID=gpuID, batch_size=batch_size, epochs = epoches, steps_per_epoch = 300, 
+                                precision=precision, acc_batches=acc_batches) #train based on init model and save new one as model_iter{num_iter}.h5
         logging.info("Start predicting!")
 
         filtered_halfmap = fsc_filter(current_map, fsc3d_full)

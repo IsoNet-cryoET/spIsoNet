@@ -33,11 +33,12 @@ class Net:
         model_scripted = torch.jit.script(self.model) # Export to TorchScript
         model_scripted.save(path) # Save
 
-    def train(self, data_path, gpuID=[0,1,2,3], learning_rate=3e-4, batch_size=None, 
+    def train(self, data_path, gpuID=[0,1,2,3], batch_size=None, 
               epochs = 10, steps_per_epoch=200, acc_batches =2,
               ncpus=8, precision=32):
-        self.model.learning_rate = learning_rate
+        #self.model.learning_rate = learning_rate
         print(batch_size)
+        print('acc_batches',acc_batches)
         #acc_grad = True
         train_batches = int(steps_per_epoch*0.9)
         val_batches = steps_per_epoch - train_batches
@@ -51,10 +52,10 @@ class Net:
         #torch.multiprocessing.set_sharing_strategy('file_system')
         train_dataset, val_dataset = get_datasets(data_path)
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True,persistent_workers=True,
-                                                num_workers=ncpus//2, pin_memory=True, drop_last=True)
+                                                num_workers=batch_size, pin_memory=True, drop_last=True)
 
         val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True,persistent_workers=True,
-                                                pin_memory=True, num_workers=ncpus//2, drop_last=True)
+                                                pin_memory=True, num_workers=batch_size, drop_last=True)
 
         self.model.train()
 
@@ -62,7 +63,7 @@ class Net:
             accumulate_grad_batches=acc_batches,
             accelerator='gpu',
             precision=precision,
-            #devices=gpuID,
+            devices=list(map(int,gpuID)),
             num_nodes=1,
             max_epochs=epochs,
             limit_train_batches = train_batches,
@@ -156,7 +157,7 @@ class Net:
 
         logging.info('Done predicting')
     
-    def predict_map(self, halfmap,halfmap_origional,mask,fsc3d_full, fsc3d, output_file, cube_size = 64, crop_size=96, batch_size = 4, voxel_size = 1.1):
+    def predict_map(self, halfmap,halfmap_origional, mask, fsc3d_full, fsc3d, output_file, cube_size = 64, crop_size=96, batch_size = 4, voxel_size = 1.1):
     #predict one tomogram in mrc format INPUT: mrc_file string OUTPUT: output_file(str) or <root_name>_corrected.mrc
 
 
