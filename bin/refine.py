@@ -132,7 +132,6 @@ def run(args):
             args.metrics = metrics
  
             network.save('{}/model_iter{:0>2d}.h5'.format(args.result_dir, args.iter_count))
-
             save_args_json(args,args.result_dir+'/refine_iter{:0>2d}.json'.format(num_iter))
             from IsoNet.util.plot_metrics import plot_metrics
             plot_metrics(metrics, args.result_dir+"/losses.png")

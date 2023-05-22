@@ -20,6 +20,7 @@ class ISONET:
     isonet.py predict -h
     isonet.py resize -h
     isonet.py gui -h
+    isonet.py map_refine -h
     """
     #log_file = "log.txt"
 
@@ -381,17 +382,17 @@ class ISONET:
                    i: str,
                    i2: str, 
                    mask_file: str, 
-                   gpuID: int=0, 
+                   gpuID: str="0", 
                    ncpus: int=16, 
                    output_dir: str="isonet_maps", 
                    limit_res: float=None, 
                    fsc_file: str=None, 
                    iterations: int=10,
+                   epochs: int=10,
                    threshold: float=None, 
                    n_subvolume: int=50, 
                    crop_size: int=96, 
                    cube_size: int=64,
-                   epoches: int=10, 
                    single_precision: bool=False,
                    batch_size: int=None, 
                    acc_batches: int=1):
@@ -419,9 +420,17 @@ class ISONET:
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
             ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])     
         
+        if type(gpuID) == str:
+            gpuID = list(set(gpuID.split(',')))
+            gpuID = list(map(int,gpuID))
+            ngpus = len(gpuID)
+        elif type(gpuID) == int:
+            ngpus = 1
+        else:
+            ngpus = len(gpuID)
+        #print(gpuID)
 
-        gpuID = str(gpuID).split(',')
-        if len(gpuID) == 1:
+        if ngpus == 1:
             batch_size = 4
         else:
             batch_size = 2 * len(gpuID)
@@ -429,7 +438,7 @@ class ISONET:
         if single_precision:
             precision = 32
         else:
-            precision = 16
+            precision = "16-mixed"
         from IsoNet.util.utils import mkfolder
         from IsoNet.preprocessing.img_processing import normalize
 
@@ -455,8 +464,7 @@ class ISONET:
         else:
             FSC_map = None
 
-        logging.info("Limit resolution to {} for IsoNet missing information recovery. \
-                     You can also tune this paramerter with --limit_res .".format(limit_res))
+        logging.info("Limit resolution to {} for IsoNet missing information recovery. You can also tune this paramerter with --limit_res .".format(limit_res))
         
         if fsc_file is not None:
             with mrcfile.open(fsc_file, 'r') as mrc:
@@ -479,12 +487,12 @@ class ISONET:
 
         logging.info("processing half map1")
         map_refine(half1, mask, fsc3d, threshold=threshold, voxel_size=voxel_size, output_dir=output_dir, 
-                   output_base="half1",  limit_res=limit_res, iterations=iterations, precision=precision, epoches = epoches,
+                   output_base="half1",  limit_res=limit_res, iterations=iterations, precision=precision, epochs = epochs,
                    n_subvolume=n_subvolume, cube_size=cube_size, crop_size=crop_size, noise_scale=noise_scale,
                    batch_size = batch_size, acc_batches = acc_batches,gpuID=gpuID)
         logging.info("processing half map2")
         map_refine(half2, mask, fsc3d, threshold=threshold, voxel_size=voxel_size, output_dir=output_dir,
-                    output_base="half2", limit_res = limit_res, iterations=iterations, precision=precision, epoches = epoches,
+                    output_base="half2", limit_res = limit_res, iterations=iterations, precision=precision, epochs = epochs,
                    n_subvolume=n_subvolume, cube_size=cube_size, crop_size=crop_size, noise_scale=noise_scale,
                    batch_size = batch_size, acc_batches = acc_batches,gpuID=gpuID)
         

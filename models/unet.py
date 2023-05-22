@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 import logging
-
+import numpy as np
 class ConvBlock(pl.LightningModule):
     # conv_per_depth fixed to 2
     def __init__(self, in_channels, out_channels, n_conv, kernel_size =3, stride=1, padding=1):
@@ -103,6 +103,8 @@ class Unet(pl.LightningModule):
             self.metrics = {'train_loss':[], 'val_loss':[]}
         else:
             self.metrics = metrics
+        self.training_loss_list = []
+        self.validation_loss_list = []
     
     def forward(self, x):
         x_org = x
@@ -130,6 +132,9 @@ class Unet(pl.LightningModule):
             loss = torch.mean(torch.div(torch.abs(out[0]-y), out[1]) + torch.log(out[1])) + c
         else:
             loss = nn.L1Loss()(out, y)
+        loss_numpy = loss.detach().cpu().numpy()
+        self.training_loss_list.append(loss_numpy)
+        self.log("loss", loss, prog_bar=True,on_step=True,sync_dist=True)
         return loss
     
     def configure_optimizers(self):
@@ -146,16 +151,23 @@ class Unet(pl.LightningModule):
                 loss = torch.mean(torch.div(torch.abs(out[0]-y), out[1]) + torch.log(out[1])) + c
             else:
                 loss = nn.L1Loss()(out, y)
+            loss_numpy = loss.cpu().numpy()
+            self.validation_loss_list.append(loss_numpy)
             return loss
 
-    def training_epoch_end(self, outputs):
-        loss = torch.stack([x['loss'] for x in outputs]).mean().item()
+    def on_train_epoch_end(self):
+        loss = np.mean(self.training_loss_list).astype(float)#torch.stack(self.training_loss_list).mean().item()
+        self.training_loss_list = []
+        #loss = torch.stack([x['loss'] for x in outputs]).mean().item()
         self.metrics["train_loss"].append(loss)
         #self.log("train_loss", loss, logger=True,on_epoch=True)
 
-    def validation_epoch_end(self, outputs):
-        loss = torch.stack(outputs).mean().item()
+    def on_validation_epoch_end(self):
+        #loss = torch.stack(self.validation_loss_list).mean().item()
+        loss = np.mean(self.validation_loss_list).astype(float)
+        self.validation_loss_list = []
         self.metrics["val_loss"].append(loss)
-        self.log("val_loss", loss, prog_bar=True,on_epoch=True)
+        self.log("val_loss", loss, prog_bar=True,on_epoch=True,sync_dist=True)
+
     
         

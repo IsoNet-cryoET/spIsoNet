@@ -15,7 +15,7 @@ def tom_ctf1d(pixelsize, voltage, cs, defocus, amplitude, phaseshift, bfactor, l
 
 
     points = np.arange(0,length)
-    points = points.astype(np.float)
+    points = points.astype(np.float32)
     points = points/(2 * length)*ny
 
     k2 = points**2
@@ -142,7 +142,7 @@ class Chunks:
         sp = np.array(vol.shape)
         self._sp = sp
         self._N = sp//cubesize+1
-        padi = np.int((cropsize - cubesize)/2)
+        padi = int((cropsize - cubesize)/2)
         padsize = (self._N*cubesize + padi - sp).astype(int)
         data = np.pad(vol,((padi,padsize[0]),(padi,padsize[1]),(padi,padsize[2])),'symmetric')
         chunks_file_list = []

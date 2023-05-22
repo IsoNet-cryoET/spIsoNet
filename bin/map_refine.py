@@ -182,7 +182,7 @@ def extract_subvolume(current_map, n_subvolume, crop_size, mask, output_dir, pre
 
 
 def map_refine(halfmap, mask, fsc3d, threshold, voxel_size, limit_res=None, 
-               iterations = 10, epoches = 10, precision = 16,
+               iterations = 10, epochs = 10, precision = 16,
                output_dir = "results", output_base="half1", n_subvolume = 50, 
                cube_size = 64, crop_size = 96, noise_scale=None, batch_size = 8, acc_batches=2, gpuID=0):
 
@@ -232,7 +232,7 @@ def map_refine(halfmap, mask, fsc3d, threshold, voxel_size, limit_res=None,
 
         logging.info("Start training!")
 
-        metrics = network.train(data_dir,gpuID=gpuID, batch_size=batch_size, epochs = epoches, steps_per_epoch = 300, 
+        metrics = network.train(data_dir,gpuID=gpuID, batch_size=batch_size, epochs = epochs, steps_per_epoch = 300, 
                                 precision=precision, acc_batches=acc_batches) #train based on init model and save new one as model_iter{num_iter}.h5
         logging.info("Start predicting!")
 

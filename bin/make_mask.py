@@ -37,7 +37,7 @@ def make_mask_sp(tomo_path, mask_name, sd = 2, offset = 3):
     out_mask = gauss > thresh
     
     shape = (offset, offset, offset)
-    k = np.ones(shape, dtype=np.int)
+    k = np.ones(shape, dtype=int)
     out_mask = convolve(out_mask, k, mode='constant')
     out_mask = out_mask > 0
     out_mask = out_mask.astype(np.uint8)

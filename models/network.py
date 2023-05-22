@@ -35,8 +35,8 @@ class Net:
 
     def train(self, data_path, gpuID=[0,1,2,3], batch_size=None, 
               epochs = 10, steps_per_epoch=200, acc_batches =2,
-              ncpus=8, precision=32):
-        #self.model.learning_rate = learning_rate
+              ncpus=8, precision=32, learning_rate=3e-4):
+        self.model.learning_rate = learning_rate
         #print(batch_size)
         #print('acc_batches',acc_batches)
         #acc_grad = True
@@ -52,23 +52,24 @@ class Net:
         #torch.multiprocessing.set_sharing_strategy('file_system')
         train_dataset, val_dataset = get_datasets(data_path)
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True,persistent_workers=True,
-                                                num_workers=batch_size, pin_memory=True, drop_last=True)
+                                                num_workers=ncpus//2, pin_memory=True, drop_last=True)
 
         val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True,persistent_workers=True,
-                                                pin_memory=True, num_workers=batch_size, drop_last=True)
+                                                pin_memory=True, num_workers=ncpus//2, drop_last=True)
 
         self.model.train()
-
+        if isinstance(gpuID, str):
+            gpuID = list(map(int,gpuID.split(',')))
         trainer = pl.Trainer(
             accumulate_grad_batches=acc_batches,
             accelerator='gpu',
             precision=precision,
-            devices=list(map(int,gpuID)),
+            devices=gpuID,
             num_nodes=1,
             max_epochs=epochs,
             limit_train_batches = train_batches,
             limit_val_batches = val_batches,
-            strategy = 'dp',
+            strategy = 'ddp',
             enable_progress_bar=True,
             logger=False,
             enable_checkpointing=False,
@@ -191,11 +192,12 @@ class Net:
 
         model = torch.nn.DataParallel(self.model.cuda())
         model.eval()
+        model.to(f'cuda:{model.device_ids[0]}')
         with torch.no_grad():
             for i in tqdm(range(num_big_batch), file=sys.stdout):#track(range(num_big_batch), description="Processing..."):
                 in_data = torch.from_numpy(np.transpose(data[i*N:(i+1)*N],(0,4,1,2,3)))
                 #print(in_data)
-                output = model(in_data)
+                output = model(in_data.to(f'cuda:{model.device_ids[0]}'))
                 out_tmp = output.cpu().detach().numpy().astype(np.float32)
                 #out_tmp = apply_wedge_dcube(out_tmp, mw3d=fsc3d,ld1=0, ld2=1)
                 out_tmp = np.transpose(out_tmp, (0,2,3,4,1) )
