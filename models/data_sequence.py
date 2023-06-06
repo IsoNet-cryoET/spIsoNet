@@ -5,13 +5,21 @@ from torch.utils.data.dataset import Dataset
 import mrcfile
 from IsoNet.preprocessing.img_processing import normalize
 class Train_sets(Dataset):
-    def __init__(self, data_dir, prefix = "train"):
+    def __init__(self, data_dir, max_length = None, shuffle=True, prefix = "train"):
         super(Train_sets, self).__init__()
         self.path_all = []
         for d in  [prefix+"_x", prefix+"_y"]:
             p = '{}/{}/'.format(data_dir, d)
             self.path_all.append(sorted([p+f for f in os.listdir(p)]))
-        #print(self.path_all)
+
+        # if shuffle:
+        #     zipped_path = list(zip(self.path_all[0],self.path_all[1]))
+        #     np.random.shuffle(zipped_path)
+        #     self.path_all[0], self.path_all[1] = zip(*zipped_path)
+        # print(self.path_all)
+        #if max_length is not None:
+        #    if max_length < len(self.path_all):
+
 
     def __getitem__(self, idx):
         with mrcfile.open(self.path_all[0][idx]) as mrc:
@@ -22,8 +30,8 @@ class Train_sets(Dataset):
             #print(self.path_all[1][idx])
             ry = mrc.data[np.newaxis,:,:,:]
             # ry = mrc.data[:,:,:,np.newaxis]
-        rx = torch.from_numpy(rx.copy())
-        ry = torch.from_numpy(ry.copy())
+        rx = torch.as_tensor(rx.copy())
+        ry = torch.as_tensor(ry.copy())
         return rx, ry
 
     def __len__(self):
@@ -49,7 +57,7 @@ class Predict_sets(Dataset):
 
 
 
-def get_datasets(data_dir):
-    train_dataset = Train_sets(data_dir, prefix="train")
-    val_dataset = Train_sets(data_dir, prefix="test")
+def get_datasets(data_dir, max_length = None):
+    train_dataset = Train_sets(data_dir, max_length, prefix="train")
+    val_dataset = Train_sets(data_dir, max_length, prefix="test")
     return train_dataset, val_dataset#, bench_dataset

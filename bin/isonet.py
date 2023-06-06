@@ -391,9 +391,9 @@ class ISONET:
                    epochs: int=10,
                    threshold: float=None, 
                    n_subvolume: int=50, 
-                   crop_size: int=96, 
-                   cube_size: int=64,
-                   single_precision: bool=False,
+                   crop_size: int=80, 
+                   cube_size: int=80,
+                   single_precision: bool=True,
                    batch_size: int=None, 
                    acc_batches: int=1):
 
@@ -404,11 +404,12 @@ class ISONET:
         :param i2: Input name of half2
         :param mask_file: Filename of a user-provided mask
         :param gpuID: The ID of gpu to be used during the training.
-        :param ncpus: Number of cpu for preprocessing.
+        :param ncpus: Number of cpu.
         :param output_dir: The name of directory to save output maps
         :param limit_res: The resolution limit for recovery, default is the resolution of the map.
-        :param fsc_file: 3DFSC file 
+        :param fsc_file: 3DFSC file if not set, isonet will generate one.
         :param iterations: Number of iterations.
+        :param epochs: TODO
         :param threshold: Threshold to make 3DFSC volume binary. We usuallly do not use it.  
         :param n_subvolume: Number of subvolumes 
         :param crop_size: The size of subvolumes, should be larger then the cube_size
@@ -418,27 +419,30 @@ class ISONET:
         :param acc_batches: If this value is set to 2 (or more), accumulate gradiant will be used to save memory consumption.  
         """
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
-            ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])     
-        
-        if type(gpuID) == str:
-            gpuID = list(set(gpuID.split(',')))
-            gpuID = list(map(int,gpuID))
-            ngpus = len(gpuID)
-        elif type(gpuID) == int:
-            ngpus = 1
-        else:
-            ngpus = len(gpuID)
-        #print(gpuID)
+            ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])   
+        from IsoNet.util.utils import process_gpuID
+        ngpus, gpuID, gpuID_list = process_gpuID(gpuID)
 
-        if ngpus == 1:
-            batch_size = 4
-        else:
-            batch_size = 2 * len(gpuID)
+        os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+        os.environ["CUDA_VISIBLE_DEVICES"]=gpuID
+
+        if batch_size is None:
+            if ngpus == 1:
+                batch_size = 4
+            else:
+                batch_size = 2 * len(gpuID_list)
 
         if single_precision:
             precision = 32
         else:
-            precision = "16-mixed"
+            precision = 16
+
+        from multiprocessing import cpu_count
+        cpu_system = cpu_count()
+        if cpu_system < ncpus:
+            logging.info("requested number of cpus is more than the number of the cpu cores in the system")
+            logging.info(f"setting ncpus to {cpu_system}")
+            ncpus = cpu_system
         from IsoNet.util.utils import mkfolder
         from IsoNet.preprocessing.img_processing import normalize
 
