@@ -380,20 +380,20 @@ class ISONET:
 
     def map_refine(self, 
                    i: str,
-                   i2: str, 
-                   mask_file: str, 
+                   i2: str=None, 
+                   mask_file: str=None, 
                    gpuID: str="0", 
                    ncpus: int=16, 
                    output_dir: str="isonet_maps", 
                    limit_res: float=None, 
                    fsc_file: str=None, 
-                   iterations: int=10,
-                   epochs: int=10,
+                   iterations: int=5,
+                   epochs: int=5,
                    threshold: float=None, 
                    n_subvolume: int=50, 
-                   crop_size: int=80, 
-                   cube_size: int=80,
-                   single_precision: bool=True,
+                   crop_size: int=96, 
+                   cube_size: int=64,
+                   mixed_precision: bool=False,
                    batch_size: int=None, 
                    acc_batches: int=1):
 
@@ -414,7 +414,7 @@ class ISONET:
         :param n_subvolume: Number of subvolumes 
         :param crop_size: The size of subvolumes, should be larger then the cube_size
         :param cube_size: Size of cubes for training, should be divisible by 8, eg. 32, 64.
-        :param single_precision: If this is False, use half precision to speed up and reduce GPU memory consumption
+        :param mixed_precision: If this is False, use half precision to speed up and reduce GPU memory consumption
         :param batch_size: Size of the minibatch. If None, batch_size will be the max(2 * number_of_gpu,4). batch_size should be divisible by the number of gpu.
         :param acc_batches: If this value is set to 2 (or more), accumulate gradiant will be used to save memory consumption.  
         """
@@ -432,11 +432,6 @@ class ISONET:
             else:
                 batch_size = 2 * len(gpuID_list)
 
-        if single_precision:
-            precision = 32
-        else:
-            precision = 16
-
         from multiprocessing import cpu_count
         cpu_system = cpu_count()
         if cpu_system < ncpus:
@@ -453,15 +448,24 @@ class ISONET:
         with mrcfile.open(i, 'r') as mrc:
             half1 = normalize(mrc.data,percentile=False)
             voxel_size = mrc.voxel_size.x
-        with mrcfile.open(i2, 'r') as mrc:
-            half2 = normalize(mrc.data,percentile=False)
-        with mrcfile.open(mask_file, 'r') as mrc:
-            mask = mrc.data
+            if voxel_size == 0:
+                voxel_size = 1
+
+        if i2 is None:
+            logging.warning("Only one half map is provided")
+        else:
+            with mrcfile.open(i2, 'r') as mrc:
+                half2 = normalize(mrc.data,percentile=False)
+
+        if mask_file is None:
+            mask = np.zeros(half1.shape, dtype = np.float32)
+        else:
+            with mrcfile.open(mask_file, 'r') as mrc:
+                mask = mrc.data
 
         from IsoNet.util.FSC import get_FSC_map, ThreeD_FSC
         if limit_res is None:
             FSC_map = get_FSC_map([half1, half2], mask)
-
             from IsoNet.bin.map_refine import recommended_resolution
             limit_res = recommended_resolution(FSC_map, voxel_size, threshold=0.143)
             logging.info("Global resolution at FSC={} is {}".format(0.143, limit_res))
@@ -491,14 +495,18 @@ class ISONET:
 
         logging.info("processing half map1")
         map_refine(half1, mask, fsc3d, threshold=threshold, voxel_size=voxel_size, output_dir=output_dir, 
-                   output_base="half1",  limit_res=limit_res, iterations=iterations, precision=precision, epochs = epochs,
+                   output_base="half1",  limit_res=limit_res, iterations=iterations, mixed_precision=mixed_precision, epochs = epochs,
                    n_subvolume=n_subvolume, cube_size=cube_size, crop_size=crop_size, noise_scale=noise_scale,
                    batch_size = batch_size, acc_batches = acc_batches,gpuID=gpuID)
-        logging.info("processing half map2")
-        map_refine(half2, mask, fsc3d, threshold=threshold, voxel_size=voxel_size, output_dir=output_dir,
-                    output_base="half2", limit_res = limit_res, iterations=iterations, precision=precision, epochs = epochs,
-                   n_subvolume=n_subvolume, cube_size=cube_size, crop_size=crop_size, noise_scale=noise_scale,
-                   batch_size = batch_size, acc_batches = acc_batches,gpuID=gpuID)
+        if i2 is not None:
+            logging.info("processing half map2")
+            map_refine(half2, mask, fsc3d, threshold=threshold, voxel_size=voxel_size, output_dir=output_dir,
+                        output_base="half2", limit_res = limit_res, iterations=iterations, mixed_precision=mixed_precision, epochs = epochs,
+                        n_subvolume=n_subvolume, cube_size=cube_size, crop_size=crop_size, noise_scale=noise_scale,
+                        batch_size = batch_size, acc_batches = acc_batches,gpuID=gpuID)
+            logging.info("Two independent half maps are saved in {}. Please use other software for postprocessing and try difference B factors".format(output_dir))
+        else:
+            logging.info("Corrected maps are saved in {}. ".format(output_dir))
         
         logging.info("removing intermediate files")
         files = os.listdir(output_dir)
@@ -510,8 +518,8 @@ class ISONET:
             if item.startswith('subvolume'):
                 path = f'{output_dir}/{item}'
                 os.remove(path)
+        logging.info("Finished")
 
-        logging.info("Two independent half maps are saved in {}. Please use other software for postprocessing and try difference B factors".format(output_dir))
 
     '''
     def map_refine_multi(self, half1_file, half2_file, mask_file, fsc_file, limit_res, output_dir="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, weighting=False):

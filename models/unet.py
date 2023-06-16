@@ -69,7 +69,7 @@ class DecoderBlock(nn.Module):
         return x
 
 class Unet(nn.Module):
-    def __init__(self,filter_base = 64, add_last=False, metrics=None):
+    def __init__(self,filter_base = 64, add_last=False):
         super(Unet, self).__init__()
         self.add_last = add_last
         if filter_base == 64:
@@ -79,7 +79,7 @@ class Unet(nn.Module):
         elif filter_base == 16:
             filter_base = [16,32,64,128,256,320]
         #filter_base = [1,1,1,1,1]
-        unet_depth = 4
+        unet_depth =4
         n_conv = 3
         self.encoder = EncoderBlock(filter_base=filter_base, unet_depth=unet_depth, n_conv=n_conv)
         self.decoder = DecoderBlock(filter_base=filter_base, unet_depth=unet_depth, n_conv=n_conv)

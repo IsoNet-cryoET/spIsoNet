@@ -13,6 +13,7 @@ import skimage
 from IsoNet.preprocessing.img_processing import normalize
 import os
 import sys
+from IsoNet.util.plot_metrics import plot_metrics
 
 def recommended_resolution(fsc3d, voxel_size, threshold = 0.5):
     diameter = fsc3d.shape[0]
@@ -26,6 +27,7 @@ def recommended_resolution(fsc3d, voxel_size, threshold = 0.5):
         a[i] = np.average(df[r==i])
         if a[i] < threshold:
             return center/(i+1)*2 * voxel_size
+    return 2 * voxel_size
         
 def crop_to_size(array, crop_size, cube_size):
         start = crop_size//2 - cube_size//2
@@ -182,12 +184,13 @@ def extract_subvolume(current_map, n_subvolume, crop_size, mask, output_dir, pre
 
 
 def map_refine(halfmap, mask, fsc3d, threshold, voxel_size, limit_res=None, 
-               iterations = 10, epochs = 10, precision = 16,
+               iterations = 10, epochs = 10, mixed_precision = False,
                output_dir = "results", output_base="half1", n_subvolume = 50, 
                cube_size = 64, crop_size = 96, noise_scale=None, batch_size = 8, acc_batches=2, gpuID="0"):
 
     data_dir = output_dir+"/data"
     mkfolder(data_dir)
+
     fsc3d_cube = rescale_fsc(fsc3d, threshold, voxel_size, limit_res, crop_size)
     # with mrcfile.new('small_FSC.mrc', overwrite=True) as mrc:
     #     mrc.set_data(fsc3d_cube)
@@ -197,6 +200,8 @@ def map_refine(halfmap, mask, fsc3d, threshold, voxel_size, limit_res=None,
 
 
     from IsoNet.models.network import Net
+    #changed add_last fopr testing
+
     network = Net(filter_base = 64, add_last=True)
 
     # need to check normalize
@@ -221,31 +226,46 @@ def map_refine(halfmap, mask, fsc3d, threshold, voxel_size, limit_res=None,
         mrc_list = extract_subvolume(current_map, n_subvolume, crop_size, mask, output_dir)
 
         logging.info("Start Iteration{}!".format(iter_count))
+
         logging.info("Start preparing subvolumes!")
         get_cubes_list(fsc3d_cube, mrc_list, data_dir, output_dir, crop_size, cube_size, noise_scale)
         split_train_test(data_dir,batch_size=batch_size)
         logging.info("Done preparing subvolumes!")
 
-        if iter_count > 1:
-            network.load("{}/model_{}_iter{}.h5".format(output_dir, output_base, iter_count-1))
         logging.info("Start training!")
-        #network.load("{}/model_{}_iter{}.h5".format(output_dir, output_base, iter_count))
-        metrics = network.train(data_dir, batch_size=batch_size, epochs = epochs, steps_per_epoch = 200, 
-                                precision=precision, acc_batches=acc_batches) #train based on init model and save new one as model_iter{num_iter}.h5
-        
+        #if iter_count > 1:
+        #    network.load("{}/model_{}_iter{}.h5".format(output_dir, output_base, iter_count-1))
+        network.train(data_dir, output_dir, batch_size=batch_size, epochs = epochs, steps_per_epoch = 200, 
+                                mixed_precision=mixed_precision, acc_batches=acc_batches) #train based on init model and save new one as model_iter{num_iter}.h5
+        #network.save("{}/model_{}_iter{}.h5".format(output_dir, output_base, iter_count))
+        plot_metrics(network.metrics, f"{output_dir}/loss.png")
 
-        network.save("{}/model_{}_iter{}.h5".format(output_dir, output_base, iter_count))
         logging.info("Start predicting!")
-
         filtered_halfmap = fsc_filter(current_map, fsc3d_full)
+        
+        # replace the edge of the map with the origional map
+        d = filtered_halfmap.shape[0]
+        r = np.arange(d)-d//2
+        [Z,Y,X] = np.meshgrid(r,r,r)
+        index = np.round(np.sqrt(Z**2+Y**2+X**2))
+        filtered_halfmap[index>r] = halfmap[index>r]
 
-        current_filename_list = []
-        current_filename = "{}/corrected_{}_iter{}.mrc".format(output_dir, output_base, iter_count)  
-        current_filename_list.append(current_filename)
-        current_filename_list.append("{}/netinput_{}_iter{}.mrc".format(output_dir, output_base, iter_count))
-        current_filename_list.append("{}/netoutput_{}_iter{}.mrc".format(output_dir, output_base, iter_count))
+        pred = network.predict_map(filtered_halfmap, output_dir=output_dir, cube_size = cube_size, crop_size=128)
+        diff_map = (pred - filtered_halfmap)
+        out_map = diff_map + halfmap
 
-        network.predict_map(filtered_halfmap, halfmap, mask, fsc3d_full, fsc3d, output_file=current_filename_list, voxel_size = voxel_size)
+        with mrcfile.new(f"{output_dir}/netinput_{output_base}_iter{iter_count}.mrc", overwrite=True) as output_mrc:
+            output_mrc.set_data(filtered_halfmap.astype(np.float32))
+            output_mrc.voxel_size = voxel_size
+     
+        with mrcfile.new(f"{output_dir}/netoutput_{output_base}_iter{iter_count}.mrc", overwrite=True) as output_mrc:
+            output_mrc.set_data(pred.astype(np.float32))
+            output_mrc.voxel_size = voxel_size
+        
+        with mrcfile.new(f"{output_dir}/corrected_{output_base}_iter{iter_count}.mrc", overwrite=True) as output_mrc:
+            output_mrc.set_data(out_map.astype(np.float32))
+            output_mrc.voxel_size = voxel_size
+      
         logging.info('Done predicting')
         
     
