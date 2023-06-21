@@ -239,14 +239,14 @@ def map_refine(halfmap, mask, fsc3d, threshold, voxel_size, limit_res=None,
         network.train(data_dir, output_dir, batch_size=batch_size, epochs = epochs, steps_per_epoch = 200, 
                                 mixed_precision=mixed_precision, acc_batches=acc_batches, learning_rate = learning_rate) #train based on init model and save new one as model_iter{num_iter}.h5
         #network.save("{}/model_{}_iter{}.h5".format(output_dir, output_base, iter_count))
-        plot_metrics(network.metrics, f"{output_dir}/loss.png")
+        plot_metrics(network.metrics, f"{output_dir}/loss_{output_base}.png")
 
         logging.info("Start predicting!")
         filtered_halfmap = fsc_filter(current_map, fsc3d_full)
 
-        with mrcfile.new(f"{output_dir}/filtered_halfmap{output_base}_iter{iter_count}.mrc", overwrite=True) as output_mrc:
-            output_mrc.set_data(filtered_halfmap.astype(np.float32))
-            output_mrc.voxel_size = voxel_size
+        #with mrcfile.new(f"{output_dir}/filtered_halfmap{output_base}_iter{iter_count}.mrc", overwrite=True) as output_mrc:
+        #    output_mrc.set_data(filtered_halfmap.astype(np.float32))
+        #    output_mrc.voxel_size = voxel_size
 
         # replace the edge of the map with the origional map
         d = filtered_halfmap.shape[0]
