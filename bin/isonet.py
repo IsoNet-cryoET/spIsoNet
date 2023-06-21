@@ -387,15 +387,17 @@ class ISONET:
                    output_dir: str="isonet_maps", 
                    limit_res: float=None, 
                    fsc_file: str=None, 
-                   iterations: int=5,
-                   epochs: int=5,
+                   iterations: int=10,
+                   epochs: int=10,
                    threshold: float=None, 
                    n_subvolume: int=50, 
                    crop_size: int=96, 
                    cube_size: int=64,
                    mixed_precision: bool=False,
                    batch_size: int=None, 
-                   acc_batches: int=1):
+                   acc_batches: int=1,
+                   learning_rate: float=4e-4
+                   ):
 
         """
         \ntrain neural network to correct preffered orientation\n
@@ -458,7 +460,7 @@ class ISONET:
                 half2 = normalize(mrc.data,percentile=False)
 
         if mask_file is None:
-            mask = np.zeros(half1.shape, dtype = np.float32)
+            mask = np.ones(half1.shape, dtype = np.float32)
         else:
             with mrcfile.open(mask_file, 'r') as mrc:
                 mask = mrc.data
@@ -489,21 +491,24 @@ class ISONET:
 
          
         from IsoNet.bin.map_refine import map_refine
-        diff_map = half1-half2
-        noise_scale = np.std(diff_map[mask>0])/1.414
-        logging.info(f"noise_scale: {noise_scale}")
+        if i2 is not None:
+            diff_map = half1-half2
+            noise_scale = np.std(diff_map[mask>0])/1.414
+            logging.info(f"noise_scale: {noise_scale}")
+        else:
+            noise_scale = 0
 
         logging.info("processing half map1")
         map_refine(half1, mask, fsc3d, threshold=threshold, voxel_size=voxel_size, output_dir=output_dir, 
                    output_base="half1",  limit_res=limit_res, iterations=iterations, mixed_precision=mixed_precision, epochs = epochs,
                    n_subvolume=n_subvolume, cube_size=cube_size, crop_size=crop_size, noise_scale=noise_scale,
-                   batch_size = batch_size, acc_batches = acc_batches,gpuID=gpuID)
+                   batch_size = batch_size, acc_batches = acc_batches,gpuID=gpuID, learning_rate=learning_rate)
         if i2 is not None:
             logging.info("processing half map2")
             map_refine(half2, mask, fsc3d, threshold=threshold, voxel_size=voxel_size, output_dir=output_dir,
                         output_base="half2", limit_res = limit_res, iterations=iterations, mixed_precision=mixed_precision, epochs = epochs,
                         n_subvolume=n_subvolume, cube_size=cube_size, crop_size=crop_size, noise_scale=noise_scale,
-                        batch_size = batch_size, acc_batches = acc_batches,gpuID=gpuID)
+                        batch_size = batch_size, acc_batches = acc_batches,gpuID=gpuID, learning_rate = learning_rate)
             logging.info("Two independent half maps are saved in {}. Please use other software for postprocessing and try difference B factors".format(output_dir))
         else:
             logging.info("Corrected maps are saved in {}. ".format(output_dir))

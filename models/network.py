@@ -19,7 +19,7 @@ from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
 import time
-import torch._dynamo as dynamo
+#import torch._dynamo as dynamo
 def find_unused_port():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind(('localhost', 0))
@@ -42,7 +42,7 @@ def ddp_train(rank, world_size, port_number, model, data_path, batch_size, acc_b
     torch.backends.cudnn.benchmark = True
 
     # Which one of the following lines should go first
-    model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
+    #model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
     #model = model.to(memory_format=torch.channels_last)
     model = model.cuda()#.to(rank)
 
@@ -55,21 +55,24 @@ def ddp_train(rank, world_size, port_number, model, data_path, batch_size, acc_b
     if mixed_precision:
         scaler = torch.cuda.amp.GradScaler()
 
-    GPU_capability = torch.cuda.get_device_capability()
-    if GPU_capability[0] >= 7:
+    #GPU_capability = torch.cuda.get_device_capability()
+    #if GPU_capability[0] >= 7:
         #print("here")
-        torch._dynamo.config.verbose = True
-        torch.set_float32_matmul_precision('high')
-        model = torch.compile(model)
+        #torch._dynamo.config.verbose = True
+    #    torch.set_float32_matmul_precision('high')
+    #    model = torch.compile(model)
     
     #from chatGPT: The DistributedSampler shuffles the indices of the entire dataset, not just the portion assigned to a specific GPU. 
 
     train_dataset, val_dataset = get_datasets(data_path)
+
+    train_sampler = DistributedSampler(train_dataset, shuffle=True, drop_last=True)
+    val_sampler = DistributedSampler(val_dataset, shuffle=True,drop_last=True)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size_gpu, persistent_workers=True,
-                                             num_workers=4, pin_memory=True, sampler=DistributedSampler(train_dataset, shuffle=True, drop_last=True))
+                                             num_workers=4, pin_memory=True, sampler=train_sampler)
 
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size_gpu, persistent_workers=True,
-                                             pin_memory=True, num_workers=4, sampler=DistributedSampler(val_dataset, shuffle=True,drop_last=True))
+                                             pin_memory=True, num_workers=4, sampler=val_sampler)
 
 
 
@@ -82,7 +85,8 @@ def ddp_train(rank, world_size, port_number, model, data_path, batch_size, acc_b
     loss_fn = nn.L1Loss()
     for epoch in range(epochs):
         #torch.cuda.empty_cache()
-
+        train_sampler.set_epoch(epoch)
+        val_sampler.set_epoch(epoch)
         with tqdm(total=total_steps, unit="batch", disable=(rank!=0)) as progress_bar:
             model.train()
             # have to convert to tensor because reduce needed it
@@ -154,7 +158,7 @@ def ddp_train(rank, world_size, port_number, model, data_path, batch_size, acc_b
                         val_loss = loss_fn(preds, y).item()
                     avg_val_loss += val_loss
                     if rank == 0:
-                        progress_bar.set_postfix({"Val_Loss": val_loss})
+                    #    progress_bar.set_postfix({"Val_Loss": val_loss})
                         progress_bar.update()                    
                     if i + 1 >= steps_per_epoch_val:
                         break
@@ -243,7 +247,7 @@ class Net:
 
     def train(self, data_path, output_dir, batch_size=None, 
               epochs = 10, steps_per_epoch=200, acc_batches =2,
-              ncpus=8, mixed_precision=False, learning_rate=1e-3):
+              ncpus=8, mixed_precision=False, learning_rate=3e-4):
         print('learning rate',learning_rate)
         self.model.zero_grad()
         model_path = f"{output_dir}/tmp.pt"
@@ -343,7 +347,7 @@ class Net:
     
     def predict_map(self, data, output_dir, cube_size = 64, crop_size=96):
      
-        reform_ins = reform3D(data,cube_size,crop_size,5)
+        reform_ins = reform3D(data,cube_size,crop_size,3)
         data = reform_ins.pad_and_crop()
         data = data[:,np.newaxis,:,:]
         data = torch.from_numpy(data)
