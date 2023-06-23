@@ -106,17 +106,21 @@ def get_cubes(mw3d, data_dir, crop_size, cube_size, noise_scale, inp):
     
     datax = apply_wedge_dcube(rotated_data, mw3d=mw3d)
 
-    noise_a = np.random.normal(size = rotated_data.shape).astype(np.float32)
-    noise_a = apply_wedge_dcube(noise_a, mw3d=mw3d, ld1 = 0, ld2 = 1)
+    if noise_scale > 0:
+        noise_a = np.random.normal(size = rotated_data.shape).astype(np.float32)
+        noise_a = apply_wedge_dcube(noise_a, mw3d=mw3d, ld1 = 0, ld2 = 1)
 
     for i in range(len(rotation_list)): 
         data_X = crop_to_size(datax[i], crop_size, cube_size)
         data_Y = crop_to_size(rotated_data[i], crop_size, cube_size)
-        noise = crop_to_size(noise_a[i], crop_size, cube_size)
+        
         
         # note change order here
         data_Y = data_Y# - data_X
-        data_X = data_X + noise / noise.std() * noise_scale
+        if noise_scale > 0:
+            noise = crop_to_size(noise_a[i], crop_size, cube_size)
+            data_X = data_X + noise / noise.std() * noise_scale
+
 
         with mrcfile.new('{}/train_x/x_{}.mrc'.format(data_dir, start), overwrite=True) as output_mrc:
             output_mrc.set_data(data_X.astype(np.float32))
@@ -187,7 +191,7 @@ def extract_subvolume(current_map, n_subvolume, crop_size, mask, output_dir, pre
 def map_refine(halfmap, mask, fsc3d, threshold, voxel_size, limit_res=None, 
                iterations = 10, epochs = 10, mixed_precision = False,
                output_dir = "results", output_base="half1", n_subvolume = 50, 
-               cube_size = 64, crop_size = 96, noise_scale=None, batch_size = 8, acc_batches=2, gpuID="0", learning_rate= 4e-4):
+               cube_size = 64, crop_size = 96, predict_crop_size=128, noise_scale=None, batch_size = 8, acc_batches=2, gpuID="0", learning_rate= 4e-4):
 
     data_dir = output_dir+"/data"
     mkfolder(data_dir)
@@ -236,7 +240,7 @@ def map_refine(halfmap, mask, fsc3d, threshold, voxel_size, limit_res=None,
         logging.info("Start training!")
         #if iter_count > 1:
         #    network.load("{}/model_{}_iter{}.h5".format(output_dir, output_base, iter_count-1))
-        network.train(data_dir, output_dir, batch_size=batch_size, epochs = epochs, steps_per_epoch = 200, 
+        network.train(data_dir, output_dir, batch_size=batch_size, epochs = epochs, steps_per_epoch = 1000, 
                                 mixed_precision=mixed_precision, acc_batches=acc_batches, learning_rate = learning_rate) #train based on init model and save new one as model_iter{num_iter}.h5
         #network.save("{}/model_{}_iter{}.h5".format(output_dir, output_base, iter_count))
         plot_metrics(network.metrics, f"{output_dir}/loss_{output_base}.png")
@@ -255,7 +259,7 @@ def map_refine(halfmap, mask, fsc3d, threshold, voxel_size, limit_res=None,
         index = np.round(np.sqrt(Z**2+Y**2+X**2))
         filtered_halfmap[index>(d//2)] = halfmap[index>(d//2)]
 
-        pred = network.predict_map(filtered_halfmap, output_dir=output_dir, cube_size = cube_size, crop_size=crop_size)
+        pred = network.predict_map(filtered_halfmap, output_dir=output_dir, cube_size = cube_size, crop_size=predict_crop_size)
         diff_map = (pred - filtered_halfmap)
         out_map = diff_map + halfmap
 

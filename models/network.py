@@ -39,10 +39,9 @@ def ddp_train(rank, world_size, port_number, model, data_path, batch_size, acc_b
     batch_size_gpu = batch_size // world_size
 
     # The following take longer time at the beginning of the training. 
-    torch.backends.cudnn.benchmark = True
 
     # Which one of the following lines should go first
-    #model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
+    model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
     #model = model.to(memory_format=torch.channels_last)
     model = model.cuda()#.to(rank)
 
@@ -94,7 +93,7 @@ def ddp_train(rank, world_size, port_number, model, data_path, batch_size, acc_b
             for i, batch in enumerate(train_loader):
                 # from chatgpt: torch.cuda.empty_cache() will not clear or reset the optimizer's state.
                 #torch.cuda.empty_cache()
-                time1 = time.time()
+                #time1 = time.time()
                 x, y = batch
                 x = x.cuda()#to(rank, non_blocking=True)
                 y = y.cuda()#to(rank, non_blocking=True)
@@ -102,21 +101,21 @@ def ddp_train(rank, world_size, port_number, model, data_path, batch_size, acc_b
                 if mixed_precision:
                     with torch.cuda.amp.autocast():
                         preds = model(x)
-                        time2 = time.time()
+                        #time2 = time.time()
                         loss = loss_fn(preds, y)
                         loss = loss / acc_batches
-                        time3 = time.time()
+                        #time3 = time.time()
                     
                     scaler.scale(loss).backward()
-                    time4 = time.time()
+                    #time4 = time.time()
                 else:
                     preds = model(x)
-                    time2 = time.time()
+                    #time2 = time.time()
                     loss = loss_fn(preds, y)
                     loss = loss / acc_batches
-                    time3 = time.time()
+                    #time3 = time.time()
                     loss.backward()
-                    time4 = time.time()
+                    #time4 = time.time()
                 loss_item = loss.item()
                 
                 
@@ -130,7 +129,7 @@ def ddp_train(rank, world_size, port_number, model, data_path, batch_size, acc_b
                 time4 = time.time()
 
                 if rank == 0 and ( (i+1)%acc_batches == 0 ):
-                   progress_bar.set_postfix({"Loss": loss_item*acc_batches, "t1": time2-time1, "t2": time3-time2, "t3": time4-time3})
+                   progress_bar.set_postfix({"Loss": loss_item*acc_batches})#, "t1": time2-time1, "t2": time3-time2, "t3": time4-time3})
                    progress_bar.update()
                 average_loss += loss_item
 
@@ -158,7 +157,7 @@ def ddp_train(rank, world_size, port_number, model, data_path, batch_size, acc_b
                         val_loss = loss_fn(preds, y).item()
                     avg_val_loss += val_loss
                     if rank == 0:
-                    #    progress_bar.set_postfix({"Val_Loss": val_loss})
+                        progress_bar.set_postfix({"Val_Loss": val_loss})
                         progress_bar.update()                    
                     if i + 1 >= steps_per_epoch_val:
                         break
@@ -222,6 +221,7 @@ def ddp_predict(rank, world_size, port_number, model, data, tmp_data_path):
 
 class Net:
     def __init__(self,filter_base=64, add_last=False):
+        torch.backends.cudnn.benchmark = True
         self.model = Unet(filter_base = filter_base, add_last=add_last)
         self.world_size = torch.cuda.device_count()
         self.port_number = str(find_unused_port())
@@ -347,7 +347,7 @@ class Net:
     
     def predict_map(self, data, output_dir, cube_size = 64, crop_size=96):
      
-        reform_ins = reform3D(data,cube_size,crop_size,3)
+        reform_ins = reform3D(data,cube_size,crop_size,5)
         data = reform_ins.pad_and_crop()
         data = data[:,np.newaxis,:,:]
         data = torch.from_numpy(data)
