@@ -77,7 +77,6 @@ def rescale_fsc(fsc3d, threshold, voxel_size, limit_res, crop_size):
 def get_cubes(mw3d, data_dir, crop_size, cube_size, noise_scale, inp):
     '''
     current iteration mrc(in the 'results') + infomation from orignal subtomo
-    normalized predicted + normalized orig -> normalize
     rotate by rotation_list and feed to get_cubes_one
     '''
     mrc, start = inp

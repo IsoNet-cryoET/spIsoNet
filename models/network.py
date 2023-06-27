@@ -1,18 +1,18 @@
+import numpy as np
+
 from .unet import Unet
 import torch
 import os
 from .data_sequence import get_datasets, Predict_sets
 import mrcfile
 from IsoNet.preprocessing.img_processing import normalize
-import numpy as np
 import torch.nn as nn
 import logging
 from IsoNet.util.toTile import reform3D
 import sys
 from tqdm import tqdm
 import socket
-
-from torch.cuda import device_count, get_device_capability
+import copy
 
 import torch.multiprocessing as mp
 from torch.utils.data.distributed import DistributedSampler
@@ -46,20 +46,19 @@ def ddp_train(rank, world_size, port_number, model, data_path, batch_size, acc_b
     model = model.cuda()#.to(rank)
 
     model = DDP(model, device_ids=[rank])
-
+    if torch.__version__ >= "2.0.0":
+        GPU_capability = torch.cuda.get_device_capability()
+        if GPU_capability[0] >= 7:
+            print(GPU_capability)
+        #torch._dynamo.config.verbose = True
+            torch.set_float32_matmul_precision('high')
+            model = torch.compile(model)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     #torch.backends.cuda.matmul.allow_tf32 = True
     #torch.backends.cudnn.allow_tf32 = True
     print(mixed_precision)
     if mixed_precision:
         scaler = torch.cuda.amp.GradScaler()
-
-    #GPU_capability = torch.cuda.get_device_capability()
-    #if GPU_capability[0] >= 7:
-        #print("here")
-        #torch._dynamo.config.verbose = True
-    #    torch.set_float32_matmul_precision('high')
-    #    model = torch.compile(model)
     
     #from chatGPT: The DistributedSampler shuffles the indices of the entire dataset, not just the portion assigned to a specific GPU. 
 
@@ -158,6 +157,7 @@ def ddp_train(rank, world_size, port_number, model, data_path, batch_size, acc_b
                     avg_val_loss += val_loss
                     if rank == 0:
                         progress_bar.set_postfix({"Val_Loss": val_loss})
+                        print(val_loss)
                         progress_bar.update()                    
                     if i + 1 >= steps_per_epoch_val:
                         break
@@ -178,7 +178,6 @@ def ddp_train(rank, world_size, port_number, model, data_path, batch_size, acc_b
             print(f"Epoch [{epoch+1}/{epochs}], Train Loss: {average_loss:.4f}, Validataion Loss: {avg_val_loss:.4f}")
     if rank == 0:
         print("saving")
-        print(avg_val_loss_list)
         torch.save({
             'model_state_dict': model.module.state_dict(),
             'average_loss': average_loss_list,
@@ -247,21 +246,25 @@ class Net:
 
     def train(self, data_path, output_dir, batch_size=None, 
               epochs = 10, steps_per_epoch=200, acc_batches =2,
-              ncpus=8, mixed_precision=False, learning_rate=3e-4):
+              mixed_precision=False, learning_rate=3e-4):
         print('learning rate',learning_rate)
+
         self.model.zero_grad()
+
         model_path = f"{output_dir}/tmp.pt"
+        if os.path.exists(model_path):
+            os.remove(model_path)
+
         try: 
-            mp.spawn(ddp_train, args=(self.world_size, self.port_number, self.model, data_path, 
-                                    batch_size, acc_batches, epochs, steps_per_epoch, learning_rate, mixed_precision, model_path), 
-                                nprocs=self.world_size)
+            mp.spawn(ddp_train, args=(self.world_size, self.port_number, self.model, data_path, batch_size, acc_batches, epochs, steps_per_epoch, learning_rate, mixed_precision, model_path), nprocs=self.world_size)
         except KeyboardInterrupt:
-            logging.info('KeyboardInterrupt: Terminating all processes...')
-            dist.destroy_process_group() 
-            os.system("kill $(ps aux | grep multiprocessing.spawn | grep -v grep | awk '{print $2}')")
+           logging.info('KeyboardInterrupt: Terminating all processes...')
+           dist.destroy_process_group() 
+           os.system("kill $(ps aux | grep multiprocessing.spawn | grep -v grep | awk '{print $2}')")
 
         checkpoint = torch.load(model_path)
         self.model.load_state_dict(checkpoint['model_state_dict'])
+
         self.metrics['average_loss'].extend(checkpoint['average_loss'])
         self.metrics['avg_val_loss'].extend(checkpoint['avg_val_loss'])
 
@@ -270,14 +273,14 @@ class Net:
 
         bench_dataset = Predict_sets(mrc_list, inverted=inverted)
         bench_loader = torch.utils.data.DataLoader(bench_dataset, batch_size=4, num_workers=1)
-
-        model = torch.nn.DataParallel(self.model.cuda())
+        model = copy.deepcopy(self.model)
+        model = torch.nn.DataParallel(model.cuda())
         model.eval()
 
         predicted = []
         with torch.no_grad():
             for _, val_data in enumerate(bench_loader):
-                    res = model(val_data) 
+                    res = model(val_data.cuda()) 
                     miu = res.cpu().detach().numpy().astype(np.float32)
                     for item in miu:
                         it = item.squeeze(0)
@@ -349,6 +352,10 @@ class Net:
      
         reform_ins = reform3D(data,cube_size,crop_size,5)
         data = reform_ins.pad_and_crop()
+        # for i,item in enumerate(data):
+        #     with mrcfile.new(f"resd_{i}.mrc", overwrite=True) as mrc:
+        #         mrc.set_data(item)
+
         data = data[:,np.newaxis,:,:]
         data = torch.from_numpy(data)
         print('data_shape',data.shape)
@@ -358,6 +365,7 @@ class Net:
 
         outData = np.load(tmp_data_path)
         outData = outData.squeeze()
+
         outData=reform_ins.restore(outData)
 
         return outData

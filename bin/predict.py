@@ -4,6 +4,9 @@ import os, sys
 from IsoNet.util.metadata import MetaData,Label,Item
 from IsoNet.util.dict2attr import idx2list
 import logging
+from IsoNet.preprocessing.img_processing import normalize
+import mrcfile
+import numpy as np
 
 def predict(args):
 
@@ -50,8 +53,22 @@ def predict(args):
                 tomo_file = it.rlnMicrographName
             tomo_root_name = os.path.splitext(os.path.basename(tomo_file))[0]
             if os.path.isfile(tomo_file):
+                
+
+                with mrcfile.open(tomo_file) as mrcData:
+                    real_data = mrcData.data.astype(np.float32)*-1
+                    voxelsize = mrcData.voxel_size
+                    real_data = normalize(real_data,percentile=args.normalize_percentile)
+                
+
                 tomo_out_name = '{}/{}_corrected.mrc'.format(args.output_dir,tomo_root_name)
-                network.predict_tomo(args,tomo_file,output_file=tomo_out_name)
+
+                outData = network.predict_map(real_data, args.output_dir, cube_size = args.cube_size, crop_size= args.crop_size)
+                outData = normalize(outData,percentile=args.normalize_percentile)
+                with mrcfile.new(tomo_out_name, overwrite=True) as output_mrc:
+                    output_mrc.set_data(-outData)
+                    output_mrc.voxel_size = voxelsize
+                #network.predict_tomo(args,tomo_file,output_file=tomo_out_name)
                 md._setItemValue(it,Label('rlnCorrectedTomoName'),tomo_out_name)
         md.write(args.star_file)
 

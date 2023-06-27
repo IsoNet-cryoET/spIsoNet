@@ -258,7 +258,7 @@ class ISONET:
         use_deconv_tomo: bool = True,
         subtomo_folder: str = "subtomo",
         subtomo_star: str = "subtomo.star",
-        cube_size: int = 64,
+        cube_size: int = 80,
         crop_size: int = None,
         log_level: str="info",
         tomo_idx = None
@@ -270,7 +270,7 @@ class ISONET:
         :param star_file: tomogram star file
         :param subtomo_folder: (subtomo) folder for output subtomograms.
         :param subtomo_star: (subtomo.star) star file for output subtomograms.
-        :param cube_size: (64) Size of cubes for training, should be divisible by 8, eg. 32, 64. The actual sizes of extracted subtomograms are this value adds 16.
+        :param cube_size: (80) Size of cubes for training, should be divisible by 8, eg. 32, 64. The actual sizes of extracted subtomograms are this value adds 16.
         :param crop_size: (None) The size of subtomogram, should be larger then the cube_size The default value is 16+cube_size.
         :param log_level: ("info") level of the output, either "info" or "debug"
         :param use_deconv_tomo: (True) If CTF deconvolved tomogram is found in tomogram.star, use that tomogram instead.
@@ -333,9 +333,9 @@ class ISONET:
         noise_dir: str = None,
         learning_rate: float = None,
 
+        mixed_precision: bool = True,
         normalize_percentile: bool = True,
 
-        prefill: bool = False,
         acc_batches: int = 1
 
     ):
@@ -367,9 +367,9 @@ class ISONET:
 
         ************************Network settings************************
 
-        :param learning_rate: (0.0004) learning rate for network training.
+        :param learning_rate: (0.0003) learning rate for network training.
         :param normalize_percentile: (True) Normalize the 5 percent and 95 percent pixel intensity to 0 and 1 respectively. If this is set to False, normalize the input to 0 mean and 1 standard dievation.
-        :param acc_batches: If this value is set to 2 (or more), accumulate gradiant will be used to save memory consumption.  
+        :param acc_batches: If this value is set to 2 (or more), accumulate gradiant will be used to save memory consumption.  Please make sure batches size is equal to or divisible by acc_batches * number_of_GPU 
         """
         from IsoNet.bin.refine import run
         d = locals()
@@ -398,7 +398,7 @@ class ISONET:
                    mixed_precision: bool=True,
                    batch_size: int=None, 
                    acc_batches: int=1,
-                   learning_rate: float=4e-4
+                   learning_rate: float=3e-4
                    ):
 
         """
@@ -638,12 +638,20 @@ class ISONET:
         print("scale_finished")
 
     def check(self):
+        logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',
+        datefmt="%m-%d %H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])
+
         from IsoNet.bin.predict import predict
         from IsoNet.bin.refine import run
         import skimage
         import PyQt5
         import tqdm
-        print('IsoNet --version 0.2 installed')
+        logging.info('IsoNet --version 1.0 alpha installed')
+        logging.info(f"checking gpu speed")
+        from IsoNet.bin.verify import verify
+        fp16, fp32 = verify()
+        logging.info(f"time for mixed/half precsion and single precision are {fp16} and {fp32}. ")
+        logging.info(f"The first number should be much smaller than the second one, if not please check whether cudnn, cuda, and pytorch versions match.")
 
     def gui(self):
         """
