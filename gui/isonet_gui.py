@@ -1956,7 +1956,7 @@ class Ui_MainWindow(object):
         self.checkBox_use_deconv_extract.setText(_translate("MainWindow", "use deconv map"))
         self.label_cube_size_extract.setText(_translate("MainWindow", "cube size"))
         self.lineEdit_cube_size_extract.setToolTip(_translate("MainWindow", "<html><head/><body><p><span style=\" font-size:9pt;\">Size of cubes for training, should be divisible by 8, eg. 32, 64. The actual sizes of extracted subtomograms are this value add 16.</span></p></body></html>"))
-        self.lineEdit_cube_size_extract.setPlaceholderText(_translate("MainWindow", "64"))
+        self.lineEdit_cube_size_extract.setPlaceholderText(_translate("MainWindow", "80"))
         self.label_tomo_index_extract.setText(_translate("MainWindow", "tomo index"))
         self.lineEdit_tomo_index_extract.setToolTip(_translate("MainWindow", "<html><head/><body><p><span style=\" font-size:9pt;\">If this value is set, process only the tomograms listed in this index. </span></p></body></html>"))
         self.groupBox_mask.setTitle(_translate("MainWindow", "Generate mask"))
