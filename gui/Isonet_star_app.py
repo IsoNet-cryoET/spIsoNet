@@ -546,7 +546,8 @@ class MainWindowUIClass( Ui_MainWindow ):
         if self.lineEdit_result_dir_refine.text():
             cmd = "{} --result_dir {}".format(cmd, self.lineEdit_result_dir_refine.text())
         if self.lineEdit_preprocessing_ncpus.text():
-            cmd = "{} --preprocessing_ncpus {}".format(cmd, self.lineEdit_preprocessing_ncpus.text())
+            #cmd = "{} --preprocessing_ncpus {}".format(cmd, self.lineEdit_preprocessing_ncpus.text())
+            cmd = "{} --ncpus {}".format(cmd, self.lineEdit_preprocessing_ncpus.text())
             
         if self.lineEdit_iteration.text():
             cmd = "{} --iterations {}".format(cmd, self.lineEdit_iteration.text())
@@ -558,8 +559,11 @@ class MainWindowUIClass( Ui_MainWindow ):
             cmd = "{} --steps_per_epoch {}".format(cmd, self.lineEdit_steps_per_epoch.text())
         if self.lineEdit_lr.text():
             cmd = "{} --learning_rate {}".format(cmd, self.lineEdit_lr.text())
-            
-                
+        if self.lineEdit_acc_batches.text():
+            cmd = "{} --acc_batches {}".format(cmd, self.lineEdit_acc_batches.text())  
+        if not self.checkBox_mixed_precision.isChecked():
+            cmd = "{} --mixed_precision {}".format(cmd, False)
+
         if self.lineEdit_noise_level.text():
             cmd = "{} --noise_level {}".format(cmd, self.lineEdit_noise_level.text())
         if self.lineEdit_noise_start_iter.text():
@@ -567,6 +571,7 @@ class MainWindowUIClass( Ui_MainWindow ):
         if not self.comboBox_noise_mode.currentText() == "noFilter":
             cmd = "{} --noise_mode {}".format(cmd, self.comboBox_noise_mode.currentText())
         
+        '''
         if self.lineEdit_drop_out.text():
             cmd = "{} --drop_out {}".format(cmd, self.lineEdit_drop_out.text())
         if self.lineEdit_network_depth.text():
@@ -585,7 +590,8 @@ class MainWindowUIClass( Ui_MainWindow ):
             cmd = "{} --batch_normalization {}".format(cmd, False)    
         if not self.checkBox_normalization_percentile.isChecked():
             cmd = "{} --normalize_percentile {}".format(cmd, False)
-            
+        '''
+
         self.save_setting()
         if self.checkBox_only_print_command_refine.isChecked() and self.pushButton_refine.text() == 'Refine':
             print(cmd)
@@ -626,9 +632,7 @@ class MainWindowUIClass( Ui_MainWindow ):
             print(cmd)
         else:
             self.start_process(cmd,self.pushButton_predict)
-
-        
-     
+   
     def view_3dmod(self):
         slected_items = self.tableWidget.selectedItems()
         if len(slected_items) > 0:
@@ -674,7 +678,6 @@ class MainWindowUIClass( Ui_MainWindow ):
         except Exception:
             print('pass')
             
-    
     def open_star( self ):
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
@@ -739,11 +742,14 @@ class MainWindowUIClass( Ui_MainWindow ):
                 self.lineEdit_lr.setText(data['lr'])
                 self.lineEdit_steps_per_epoch.setText(data['steps_per_epoch'])
                 self.lineEdit_batch_size.setText(data['batch_size'])
+                self.lineEdit_acc_batches.setText(data['acc_batches'])
+                self.checkBox_mixed_precision.setChecked(data['mixed_precision'] == 'True')
 
                 self.lineEdit_noise_level.setText(data['noise_level'])
                 self.lineEdit_noise_start_iter.setText(data['noise_start_iter'])
                 self.comboBox_noise_mode.setCurrentText(data['noise_mode'])
 
+                '''
                 self.lineEdit_drop_out.setText(data['drop_out'])
                 self.lineEdit_network_depth.setText(data['network_depth'])
                 self.lineEdit_convs_per_depth.setText(data['convs_per_depth'])
@@ -752,6 +758,7 @@ class MainWindowUIClass( Ui_MainWindow ):
                 self.checkBox_pool.setChecked(data['pool'] == 'True')
                 self.checkBox_batch_normalization.setChecked(data['batch_normalization'] == 'True')
                 self.checkBox_normalization_percentile.setChecked(data['normalization_percentile'] == 'True')
+                '''
 
                 self.lineEdit_tomo_star_predict.setText(data['tomo_star_predict'])
                 self.lineEdit_gpuID_predict.setText(data['gpuID_predict'])
@@ -798,11 +805,14 @@ class MainWindowUIClass( Ui_MainWindow ):
         param['lr'] = self.lineEdit_lr.text()
         param['steps_per_epoch'] = self.lineEdit_steps_per_epoch.text()
         param['batch_size'] = self.lineEdit_batch_size.text()
+        param['acc_batches'] = self.lineEdit_acc_batches.text()
+        param['mixed_precision'] = self.checkBox_mixed_precision.isChecked()
 
         param['noise_level'] = self.lineEdit_noise_level.text()
         param['noise_start_iter'] = self.lineEdit_noise_start_iter.text()
         param['noise_mode'] = self.comboBox_noise_mode.currentText()
 
+        '''
         param['drop_out'] = self.lineEdit_drop_out.text()
         param['network_depth'] = self.lineEdit_network_depth.text()
         param['convs_per_depth'] = self.lineEdit_convs_per_depth.text()
@@ -811,6 +821,7 @@ class MainWindowUIClass( Ui_MainWindow ):
         param['pool'] = self.checkBox_pool.isChecked()
         param['batch_normalization'] = self.checkBox_batch_normalization.isChecked()
         param['normalization_percentile'] = self.checkBox_normalization_percentile.isChecked()
+        '''
 
         param['tomo_star_predict'] = self.lineEdit_tomo_star_predict.text()
         param['gpuID_predict'] = self.lineEdit_gpuID_predict.text()
