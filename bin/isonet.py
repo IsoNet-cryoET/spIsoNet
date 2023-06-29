@@ -331,7 +331,7 @@ class ISONET:
         noise_start_iter: tuple=(11,16,21,26),
         noise_mode: str = None,
         noise_dir: str = None,
-        learning_rate: float = None,
+        learning_rate: float = 0.0003,
 
         mixed_precision: bool = True,
         normalize_percentile: bool = True,
