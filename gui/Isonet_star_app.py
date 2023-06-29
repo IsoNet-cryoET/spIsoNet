@@ -887,17 +887,35 @@ class MyWindow(QtWidgets.QMainWindow):
 
 stylesheet = """
 
+QPushButton#run {
+    background: rgb(239,221,241);
+    font: 14px;
+}
 
-QWidget #tab, #tab_2, #tab_3{
-    background-color: rgb(253,247,226)
+QGroupBox{
+    font: 12px;
+}
+
+QListWidget {
+    outline: 0px;
+    font: 14px;
+    font-weight:bold;
+    background: #e5eaf5
 }
 
 QTabWidget{
+    font: 16px;
     background: rgb(144,160,187)
 }
 
-QPushButton {
-    background: rgb(239,221,241)
+QLabel{
+    font-weight: bold;
+    font: 14px;
+}
+
+
+QWidget #tab, #tab_2, #tab_3, #tab_spa{
+    background-color: rgb(253,247,226)
 }
 
 

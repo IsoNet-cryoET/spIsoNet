@@ -9,6 +9,8 @@
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import QListWidgetItem, QListWidget
+from PyQt5.QtCore import Qt, QSize
 
 class iFont(QtGui.QFont):
     def __init__(self,size):
@@ -56,8 +58,7 @@ class iLineEdit(QtWidgets.QLineEdit):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.setFont(font)
-        self.setWhatsThis("")
-        self.setStyleSheet("")
+        #self.setWhatsThis("")
         self.setText("")
         self.setPlaceholderText("")
         self.setObjectName(name)
@@ -65,7 +66,7 @@ class iLineEdit(QtWidgets.QLineEdit):
 class iPushButton(QtWidgets.QPushButton):
     def __init__(self, groupBox, name):
         super(iPushButton,self).__init__(groupBox)
-        self.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.setText("")
         icon = QtGui.QIcon()
         icon.addPixmap(QtGui.QPixmap(".\\../Isonet/icons/icon_folder.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
@@ -74,40 +75,56 @@ class iPushButton(QtWidgets.QPushButton):
         self.setObjectName(name)
 
 class Ui_MainWindow(object):
-    def setupUi(self, MainWindow):
-        MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(912, 868)
-        self.mw = MainWindow
-        self.centralwidget = QtWidgets.QWidget(MainWindow)
-        self.centralwidget.setStyleSheet("")
-        self.centralwidget.setObjectName("centralwidget")
-
-        self.gridLayout_2 = QtWidgets.QGridLayout(self.centralwidget)
-        self.gridLayout_2.setObjectName("gridLayout_2")
-
-        self.tabWidget = QtWidgets.QTabWidget(self.centralwidget)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+    
+    def setupUi_SPA(self):
+        self.tab_spa = QtWidgets.QWidget()
+        self.tab_spa.setToolTip("")
+        self.tab_spa.setObjectName("tab_spa")
+        self.gridLayout_spa = QtWidgets.QGridLayout(self.tab_spa)
+        self.gridLayout_spa.setObjectName("gridLayout_spa")
+        self.groupBox_spa_1 = QtWidgets.QGroupBox(self.tab_spa)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.tabWidget.sizePolicy().hasHeightForWidth())
-        self.tabWidget.setSizePolicy(sizePolicy)
-        font = iFont(14)
-        self.tabWidget.setFont(font)
-        self.tabWidget.setToolTip("")
-        self.tabWidget.setStyleSheet("")
-        self.tabWidget.setTabPosition(QtWidgets.QTabWidget.North)
-        self.tabWidget.setTabShape(QtWidgets.QTabWidget.Triangular)
-        self.tabWidget.setIconSize(QtCore.QSize(36, 36))
-        self.tabWidget.setUsesScrollButtons(True)
-        self.tabWidget.setDocumentMode(False)
-        self.tabWidget.setTabsClosable(False)
-        self.tabWidget.setMovable(False)
-        self.tabWidget.setTabBarAutoHide(False)
-        self.tabWidget.setObjectName("tabWidget")
+        sizePolicy.setHeightForWidth(self.groupBox_spa_1.sizePolicy().hasHeightForWidth())
+        self.groupBox_spa_1.setSizePolicy(sizePolicy)
+        self.groupBox_spa_1.setMinimumSize(QtCore.QSize(0, 80))
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        font.setBold(True)
+        font.setWeight(75)
+        self.groupBox_spa_1.setFont(font)
+        self.groupBox_spa_1.setObjectName("groupBox_spa_1")
+        self.gridLayout_spa_1 = QtWidgets.QGridLayout(self.groupBox_spa_1)
+        self.gridLayout_spa_1.setObjectName("gridLayout_spa_1")
+        self.horizontalLayout_spa_1 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_spa_1.setObjectName("horizontalLayout_spa_1")
+        self.label_half_1 = QtWidgets.QLabel(self.groupBox_spa_1)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.label_half_1.sizePolicy().hasHeightForWidth())
+        self.horizontalLayout_spa_1.addWidget(self.label_half_1)
+        self.label_half_1.setSizePolicy(sizePolicy)
+        self.label_half_1.setMinimumSize(QtCore.QSize(120, 0))
+        self.gridLayout_spa_1.addLayout(self.horizontalLayout_spa_1,0,0,1,1)
+        #self.gridLayout_spa_1.addLayout(self.horizontalLayout_spa_2,1,0,1,1)
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        font.setBold(False)
+        font.setWeight(50)
+        self.gridLayout_spa.addWidget(self.groupBox_spa_1)
+        self.tabWidget_2.addTab(self.tab_spa, "Refinement")
+        self.tabWidget_2.setTabShape(QtWidgets.QTabWidget.Triangular)
         
+    def setupUi_Tomo(self):
+        self.setupUi_Preparation()
+        self.setupUi_Refine()
+        self.setupUi_Prediction()
+    
+    def setupUi_Preparation(self):
         self.tab = QtWidgets.QWidget()
         self.tab.setAutoFillBackground(True)
-        self.tab.setStyleSheet("")
         self.tab.setObjectName("tab")
 
         self.gridLayout = QtWidgets.QGridLayout(self.tab)
@@ -173,8 +190,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_ncpu.setFont(font)
-        self.label_ncpu.setWhatsThis("")
-        self.label_ncpu.setStyleSheet("")
+        #self.label_ncpu.setWhatsThis("")
         self.label_ncpu.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_ncpu.setObjectName("label_ncpu")
         self.horizontalLayout_4.addWidget(self.label_ncpu)
@@ -189,7 +205,6 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_ncpu.setFont(font)
-        self.lineEdit_ncpu.setStyleSheet("")
         self.lineEdit_ncpu.setObjectName("lineEdit_ncpu")
         self.horizontalLayout_4.addWidget(self.lineEdit_ncpu)
         self.horizontalLayout_8.addLayout(self.horizontalLayout_4)
@@ -207,8 +222,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_chunk_size.setFont(font)
-        self.label_chunk_size.setWhatsThis("")
-        self.label_chunk_size.setStyleSheet("")
+        #self.label_chunk_size.setWhatsThis("")
         self.label_chunk_size.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_chunk_size.setObjectName("label_chunk_size")
         self.horizontalLayout_3.addWidget(self.label_chunk_size)
@@ -223,7 +237,6 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_chunk_size.setFont(font)
-        self.lineEdit_chunk_size.setStyleSheet("")
         self.lineEdit_chunk_size.setObjectName("lineEdit_chunk_size")
         self.horizontalLayout_3.addWidget(self.lineEdit_chunk_size)
         self.horizontalLayout_8.addLayout(self.horizontalLayout_3)
@@ -241,8 +254,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_highpassnyquist.setFont(font)
-        self.label_highpassnyquist.setWhatsThis("")
-        self.label_highpassnyquist.setStyleSheet("")
+        #self.label_highpassnyquist.setWhatsThis("")
         self.label_highpassnyquist.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_highpassnyquist.setObjectName("label_highpassnyquist")
         self.horizontalLayout_2.addWidget(self.label_highpassnyquist)
@@ -257,7 +269,6 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_highpassnyquist.setFont(font)
-        self.lineEdit_highpassnyquist.setStyleSheet("")
         self.lineEdit_highpassnyquist.setObjectName("lineEdit_highpassnyquist")
         self.horizontalLayout_2.addWidget(self.lineEdit_highpassnyquist)
         self.horizontalLayout_8.addLayout(self.horizontalLayout_2)
@@ -275,8 +286,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_overlap.setFont(font)
-        self.label_overlap.setWhatsThis("")
-        self.label_overlap.setStyleSheet("")
+        #self.label_overlap.setWhatsThis("")
         self.label_overlap.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_overlap.setObjectName("label_overlap")
         self.horizontalLayout_5.addWidget(self.label_overlap)
@@ -291,7 +301,6 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_overlap.setFont(font)
-        self.lineEdit_overlap.setStyleSheet("")
         self.lineEdit_overlap.setObjectName("lineEdit_overlap")
         self.horizontalLayout_5.addWidget(self.lineEdit_overlap)
         self.horizontalLayout_8.addLayout(self.horizontalLayout_5)
@@ -345,7 +354,6 @@ class Ui_MainWindow(object):
         font.setBold(True)
         font.setWeight(75)
         self.lineEdit_subtomo_dir.setFont(font)
-        self.lineEdit_subtomo_dir.setStyleSheet("")
         self.lineEdit_subtomo_dir.setText("")
         self.lineEdit_subtomo_dir.setObjectName("lineEdit_subtomo_dir")
         self.horizontalLayout_40.addWidget(self.lineEdit_subtomo_dir)
@@ -366,8 +374,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_subtomo_star_extract.setFont(font)
-        self.label_subtomo_star_extract.setWhatsThis("")
-        self.label_subtomo_star_extract.setStyleSheet("")
+        #self.label_subtomo_star_extract.setWhatsThis("")
         self.label_subtomo_star_extract.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_subtomo_star_extract.setObjectName("label_subtomo_star_extract")
         self.horizontalLayout_60.addWidget(self.label_subtomo_star_extract)
@@ -384,7 +391,7 @@ class Ui_MainWindow(object):
         font.setBold(True)
         font.setWeight(75)
         self.lineEdit_subtomo_star_extract.setFont(font)
-        self.lineEdit_subtomo_star_extract.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_subtomo_star_extract.setText("")
         self.lineEdit_subtomo_star_extract.setObjectName("lineEdit_subtomo_star_extract")
         self.horizontalLayout_60.addWidget(self.lineEdit_subtomo_star_extract)
@@ -414,8 +421,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_cube_size_extract.setFont(font)
-        self.label_cube_size_extract.setWhatsThis("")
-        self.label_cube_size_extract.setStyleSheet("")
+        #self.label_cube_size_extract.setWhatsThis("")
         self.label_cube_size_extract.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_cube_size_extract.setObjectName("label_cube_size_extract")
         self.horizontalLayout_19.addWidget(self.label_cube_size_extract)
@@ -430,7 +436,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_cube_size_extract.setFont(font)
-        self.lineEdit_cube_size_extract.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_cube_size_extract.setObjectName("lineEdit_cube_size_extract")
         self.horizontalLayout_19.addWidget(self.lineEdit_cube_size_extract)
         self.horizontalLayout_18.addLayout(self.horizontalLayout_19)
@@ -448,8 +454,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_tomo_index_extract.setFont(font)
-        self.label_tomo_index_extract.setWhatsThis("")
-        self.label_tomo_index_extract.setStyleSheet("")
+        #self.label_tomo_index_extract.setWhatsThis("")
         self.label_tomo_index_extract.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_tomo_index_extract.setObjectName("label_tomo_index_extract")
         self.horizontalLayout_20.addWidget(self.label_tomo_index_extract)
@@ -464,7 +469,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_tomo_index_extract.setFont(font)
-        self.lineEdit_tomo_index_extract.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_tomo_index_extract.setPlaceholderText("")
         self.lineEdit_tomo_index_extract.setObjectName("lineEdit_tomo_index_extract")
         self.horizontalLayout_20.addWidget(self.lineEdit_tomo_index_extract)
@@ -514,8 +519,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_patch_size.setFont(font)
-        self.label_patch_size.setWhatsThis("")
-        self.label_patch_size.setStyleSheet("")
+        #self.label_patch_size.setWhatsThis("")
         self.label_patch_size.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_patch_size.setObjectName("label_patch_size")
         self.horizontalLayout_12.addWidget(self.label_patch_size)
@@ -530,7 +534,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_patch_size.setFont(font)
-        self.lineEdit_patch_size.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_patch_size.setObjectName("lineEdit_patch_size")
         self.horizontalLayout_12.addWidget(self.lineEdit_patch_size)
         self.horizontalLayout_11.addLayout(self.horizontalLayout_12)
@@ -548,8 +552,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_z_crop.setFont(font)
-        self.label_z_crop.setWhatsThis("")
-        self.label_z_crop.setStyleSheet("")
+        #self.label_z_crop.setWhatsThis("")
         self.label_z_crop.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_z_crop.setObjectName("label_z_crop")
         self.horizontalLayout_13.addWidget(self.label_z_crop)
@@ -564,7 +567,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_z_crop.setFont(font)
-        self.lineEdit_z_crop.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_z_crop.setObjectName("lineEdit_z_crop")
         self.horizontalLayout_13.addWidget(self.lineEdit_z_crop)
         self.horizontalLayout_11.addLayout(self.horizontalLayout_13)
@@ -599,7 +602,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_mask_dir.setFont(font)
-        self.lineEdit_mask_dir.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_mask_dir.setText("")
         self.lineEdit_mask_dir.setObjectName("lineEdit_mask_dir")
         self.horizontalLayout_15.addWidget(self.lineEdit_mask_dir)
@@ -620,8 +623,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_tomo_index_mask.setFont(font)
-        self.label_tomo_index_mask.setWhatsThis("")
-        self.label_tomo_index_mask.setStyleSheet("")
+        #self.label_tomo_index_mask.setWhatsThis("")
         self.label_tomo_index_mask.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_tomo_index_mask.setObjectName("label_tomo_index_mask")
         self.horizontalLayout_16.addWidget(self.label_tomo_index_mask)
@@ -636,7 +638,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_tomo_index_mask.setFont(font)
-        self.lineEdit_tomo_index_mask.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_tomo_index_mask.setPlaceholderText("")
         self.lineEdit_tomo_index_mask.setObjectName("lineEdit_tomo_index_mask")
         self.horizontalLayout_16.addWidget(self.lineEdit_tomo_index_mask)
@@ -748,6 +750,8 @@ class Ui_MainWindow(object):
         self.horizontalLayout.addLayout(self.verticalLayout)
         self.gridLayout.addLayout(self.horizontalLayout, 0, 0, 1, 1)
         self.tabWidget.addTab(self.tab, "")
+
+    def setupUi_Refine(self):
         self.tab_2 = QtWidgets.QWidget()
         self.tab_2.setToolTip("")
         self.tab_2.setObjectName("tab_2")
@@ -784,8 +788,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_noise_level.setFont(font)
-        self.label_noise_level.setWhatsThis("")
-        self.label_noise_level.setStyleSheet("")
+        #self.label_noise_level.setWhatsThis("")
         self.label_noise_level.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_noise_level.setObjectName("label_noise_level")
         self.horizontalLayout_38.addWidget(self.label_noise_level)
@@ -800,7 +803,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_noise_level.setFont(font)
-        self.lineEdit_noise_level.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_noise_level.setObjectName("lineEdit_noise_level")
         self.horizontalLayout_38.addWidget(self.lineEdit_noise_level)
         self.horizontalLayout_10.addLayout(self.horizontalLayout_38)
@@ -818,8 +821,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_noise_start_iter.setFont(font)
-        self.label_noise_start_iter.setWhatsThis("")
-        self.label_noise_start_iter.setStyleSheet("")
+        #self.label_noise_start_iter.setWhatsThis("")
         self.label_noise_start_iter.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_noise_start_iter.setObjectName("label_noise_start_iter")
         self.horizontalLayout_37.addWidget(self.label_noise_start_iter)
@@ -834,7 +836,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_noise_start_iter.setFont(font)
-        self.lineEdit_noise_start_iter.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_noise_start_iter.setObjectName("lineEdit_noise_start_iter")
         self.horizontalLayout_37.addWidget(self.lineEdit_noise_start_iter)
         self.horizontalLayout_10.addLayout(self.horizontalLayout_37)
@@ -852,8 +854,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_noise_mode.setFont(font)
-        self.label_noise_mode.setWhatsThis("")
-        self.label_noise_mode.setStyleSheet("")
+        #self.label_noise_mode.setWhatsThis("")
         self.label_noise_mode.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_noise_mode.setObjectName("label_noise_mode")
         self.horizontalLayout_39.addWidget(self.label_noise_mode)
@@ -899,8 +900,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_drop_out.setFont(font)
-        self.label_drop_out.setWhatsThis("")
-        self.label_drop_out.setStyleSheet("")
+        #self.label_drop_out.setWhatsThis("")
         self.label_drop_out.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_drop_out.setObjectName("label_drop_out")
         self.horizontalLayout_42.addWidget(self.label_drop_out)
@@ -915,7 +915,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_drop_out.setFont(font)
-        self.lineEdit_drop_out.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_drop_out.setObjectName("lineEdit_drop_out")
         self.horizontalLayout_42.addWidget(self.lineEdit_drop_out)
         self.horizontalLayout_48.addLayout(self.horizontalLayout_42)
@@ -933,8 +933,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_network_depth.setFont(font)
-        self.label_network_depth.setWhatsThis("")
-        self.label_network_depth.setStyleSheet("")
+        #self.label_network_depth.setWhatsThis("")
         self.label_network_depth.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_network_depth.setObjectName("label_network_depth")
         self.horizontalLayout_41.addWidget(self.label_network_depth)
@@ -949,7 +948,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_network_depth.setFont(font)
-        self.lineEdit_network_depth.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_network_depth.setObjectName("lineEdit_network_depth")
         self.horizontalLayout_41.addWidget(self.lineEdit_network_depth)
         self.horizontalLayout_48.addLayout(self.horizontalLayout_41)
@@ -967,8 +966,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_convs_per_depth.setFont(font)
-        self.label_convs_per_depth.setWhatsThis("")
-        self.label_convs_per_depth.setStyleSheet("")
+        #self.label_convs_per_depth.setWhatsThis("")
         self.label_convs_per_depth.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_convs_per_depth.setObjectName("label_convs_per_depth")
         self.horizontalLayout_43.addWidget(self.label_convs_per_depth)
@@ -983,7 +981,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_convs_per_depth.setFont(font)
-        self.lineEdit_convs_per_depth.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_convs_per_depth.setReadOnly(False)
         self.lineEdit_convs_per_depth.setObjectName("lineEdit_convs_per_depth")
         self.horizontalLayout_43.addWidget(self.lineEdit_convs_per_depth)
@@ -1005,8 +1003,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_kernel.setFont(font)
-        self.label_kernel.setWhatsThis("")
-        self.label_kernel.setStyleSheet("")
+        #self.label_kernel.setWhatsThis("")
         self.label_kernel.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_kernel.setObjectName("label_kernel")
         self.horizontalLayout_45.addWidget(self.label_kernel)
@@ -1021,7 +1018,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_kernel.setFont(font)
-        self.lineEdit_kernel.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_kernel.setObjectName("lineEdit_kernel")
         self.horizontalLayout_45.addWidget(self.lineEdit_kernel)
         self.horizontalLayout_44.addLayout(self.horizontalLayout_45)
@@ -1041,8 +1038,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_filter_base.setFont(font)
-        self.label_filter_base.setWhatsThis("")
-        self.label_filter_base.setStyleSheet("")
+        #self.label_filter_base.setWhatsThis("")
         self.label_filter_base.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_filter_base.setObjectName("label_filter_base")
         self.horizontalLayout_46.addWidget(self.label_filter_base)
@@ -1057,7 +1053,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_filter_base.setFont(font)
-        self.lineEdit_filter_base.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_filter_base.setObjectName("lineEdit_filter_base")
         self.horizontalLayout_46.addWidget(self.lineEdit_filter_base)
         self.horizontalLayout_44.addLayout(self.horizontalLayout_46)
@@ -1134,8 +1130,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_epoch.setFont(font)
-        self.label_epoch.setWhatsThis("")
-        self.label_epoch.setStyleSheet("")
+        #self.label_epoch.setWhatsThis("")
         self.label_epoch.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_epoch.setObjectName("label_epoch")
         self.horizontalLayout_35.addWidget(self.label_epoch)
@@ -1150,7 +1145,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_epoch.setFont(font)
-        self.lineEdit_epoch.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_epoch.setObjectName("lineEdit_epoch")
         self.horizontalLayout_35.addWidget(self.lineEdit_epoch)
         self.horizontalLayout_62.addLayout(self.horizontalLayout_35)
@@ -1168,8 +1163,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_iteration.setFont(font)
-        self.label_iteration.setWhatsThis("")
-        self.label_iteration.setStyleSheet("")
+        #self.label_iteration.setWhatsThis("")
         self.label_iteration.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_iteration.setObjectName("label_iteration")
         self.horizontalLayout_26.addWidget(self.label_iteration)
@@ -1184,7 +1178,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_iteration.setFont(font)
-        self.lineEdit_iteration.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_iteration.setObjectName("lineEdit_iteration")
         self.horizontalLayout_26.addWidget(self.lineEdit_iteration)
         self.horizontalLayout_62.addLayout(self.horizontalLayout_26)
@@ -1202,8 +1196,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_lr.setFont(font)
-        self.label_lr.setWhatsThis("")
-        self.label_lr.setStyleSheet("")
+        #self.label_lr.setWhatsThis("")
         self.label_lr.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_lr.setObjectName("label_lr")
         self.horizontalLayout_63.addWidget(self.label_lr)
@@ -1218,7 +1211,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_lr.setFont(font)
-        self.lineEdit_lr.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_lr.setObjectName("lineEdit_lr")
         self.horizontalLayout_63.addWidget(self.lineEdit_lr)
         self.horizontalLayout_62.addLayout(self.horizontalLayout_63)
@@ -1239,8 +1232,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_steps_per_epoch.setFont(font)
-        self.label_steps_per_epoch.setWhatsThis("")
-        self.label_steps_per_epoch.setStyleSheet("")
+        #self.label_steps_per_epoch.setWhatsThis("")
         self.label_steps_per_epoch.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_steps_per_epoch.setObjectName("label_steps_per_epoch")
         self.horizontalLayout_36.addWidget(self.label_steps_per_epoch)
@@ -1255,7 +1247,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_steps_per_epoch.setFont(font)
-        self.lineEdit_steps_per_epoch.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_steps_per_epoch.setObjectName("lineEdit_steps_per_epoch")
         self.horizontalLayout_36.addWidget(self.lineEdit_steps_per_epoch)
         self.horizontalLayout_25.addLayout(self.horizontalLayout_36)
@@ -1273,8 +1265,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_batch_size_refine.setFont(font)
-        self.label_batch_size_refine.setWhatsThis("")
-        self.label_batch_size_refine.setStyleSheet("")
+        #self.label_batch_size_refine.setWhatsThis("")
         self.label_batch_size_refine.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_batch_size_refine.setObjectName("label_batch_size_refine")
         self.horizontalLayout_27.addWidget(self.label_batch_size_refine)
@@ -1289,7 +1280,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_batch_size.setFont(font)
-        self.lineEdit_batch_size.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_batch_size.setObjectName("lineEdit_batch_size")
         self.horizontalLayout_27.addWidget(self.lineEdit_batch_size)
         self.horizontalLayout_25.addLayout(self.horizontalLayout_27)
@@ -1309,8 +1300,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_acc_batches.setFont(font)
-        self.label_acc_batches.setWhatsThis("")
-        self.label_acc_batches.setStyleSheet("")
+        #self.label_acc_batches.setWhatsThis("")
         self.label_acc_batches.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_acc_batches.setObjectName("label_acc_batches")
         self.horizontalLayout_update1_2.addWidget(self.label_acc_batches)
@@ -1325,7 +1315,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_acc_batches.setFont(font)
-        self.lineEdit_acc_batches.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_acc_batches.setObjectName("lineEdit_acc_batches")
         self.horizontalLayout_update1_2.addWidget(self.lineEdit_acc_batches)
         self.horizontalLayout_25.addLayout(self.horizontalLayout_update1_2)
@@ -1404,7 +1394,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_subtomo_star_refine.setFont(font)
-        self.lineEdit_subtomo_star_refine.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_subtomo_star_refine.setText("")
         self.lineEdit_subtomo_star_refine.setObjectName("lineEdit_subtomo_star_refine")
         self.horizontalLayout_23.addWidget(self.lineEdit_subtomo_star_refine)
@@ -1425,8 +1415,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_gpuID_refine.setFont(font)
-        self.label_gpuID_refine.setWhatsThis("")
-        self.label_gpuID_refine.setStyleSheet("")
+        #self.label_gpuID_refine.setWhatsThis("")
         self.label_gpuID_refine.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_gpuID_refine.setObjectName("label_gpuID_refine")
         self.horizontalLayout_24.addWidget(self.label_gpuID_refine)
@@ -1441,7 +1430,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_gpuID_refine.setFont(font)
-        self.lineEdit_gpuID_refine.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_gpuID_refine.setPlaceholderText("")
         self.lineEdit_gpuID_refine.setObjectName("lineEdit_gpuID_refine")
         self.horizontalLayout_24.addWidget(self.lineEdit_gpuID_refine)
@@ -1477,7 +1466,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_pretrain_model_refine.setFont(font)
-        self.lineEdit_pretrain_model_refine.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_pretrain_model_refine.setText("")
         self.lineEdit_pretrain_model_refine.setPlaceholderText("")
         self.lineEdit_pretrain_model_refine.setObjectName("lineEdit_pretrain_model_refine")
@@ -1499,8 +1488,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_continue_iter.setFont(font)
-        self.label_continue_iter.setWhatsThis("")
-        self.label_continue_iter.setStyleSheet("")
+        #self.label_continue_iter.setWhatsThis("")
         self.label_continue_iter.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_continue_iter.setObjectName("label_continue_iter")
         self.horizontalLayout_30.addWidget(self.label_continue_iter)
@@ -1515,7 +1503,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_continue_iter.setFont(font)
-        self.lineEdit_continue_iter.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_continue_iter.setPlaceholderText("")
         self.lineEdit_continue_iter.setObjectName("lineEdit_continue_iter")
         self.horizontalLayout_30.addWidget(self.lineEdit_continue_iter)
@@ -1553,7 +1541,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_result_dir_refine.setFont(font)
-        self.lineEdit_result_dir_refine.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_result_dir_refine.setText("")
         self.lineEdit_result_dir_refine.setObjectName("lineEdit_result_dir_refine")
         self.horizontalLayout_32.addWidget(self.lineEdit_result_dir_refine)
@@ -1574,8 +1562,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_preprocessing_ncpus.setFont(font)
-        self.label_preprocessing_ncpus.setWhatsThis("")
-        self.label_preprocessing_ncpus.setStyleSheet("")
+        #self.label_preprocessing_ncpus.setWhatsThis("")
         self.label_preprocessing_ncpus.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_preprocessing_ncpus.setObjectName("label_preprocessing_ncpus")
         self.horizontalLayout_33.addWidget(self.label_preprocessing_ncpus)
@@ -1590,7 +1577,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_preprocessing_ncpus.setFont(font)
-        self.lineEdit_preprocessing_ncpus.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_preprocessing_ncpus.setObjectName("lineEdit_preprocessing_ncpus")
         self.horizontalLayout_33.addWidget(self.lineEdit_preprocessing_ncpus)
         self.horizontalLayout_31.addLayout(self.horizontalLayout_33)
@@ -1632,6 +1619,8 @@ class Ui_MainWindow(object):
         self.gridLayout_9.addItem(self.spacerItem_refine_tab, 4, 0, 1, 1)
 
         self.tabWidget.addTab(self.tab_2, "")
+        
+    def setupUi_Prediction(self):
         self.tab_3 = QtWidgets.QWidget()
         self.tab_3.setObjectName("tab_3")
         self.gridLayout_12 = QtWidgets.QGridLayout(self.tab_3)
@@ -1683,7 +1672,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_tomo_star_predict.setFont(font)
-        self.lineEdit_tomo_star_predict.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_tomo_star_predict.setText("")
         self.lineEdit_tomo_star_predict.setObjectName("lineEdit_tomo_star_predict")
         self.horizontalLayout_51.addWidget(self.lineEdit_tomo_star_predict)
@@ -1705,8 +1694,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_gpuID_predict.setFont(font)
-        self.label_gpuID_predict.setWhatsThis("")
-        self.label_gpuID_predict.setStyleSheet("")
+        #self.label_gpuID_predict.setWhatsThis("")
         self.label_gpuID_predict.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_gpuID_predict.setObjectName("label_gpuID_predict")
         self.horizontalLayout_50.addWidget(self.label_gpuID_predict)
@@ -1721,7 +1709,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_gpuID_predict.setFont(font)
-        self.lineEdit_gpuID_predict.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_gpuID_predict.setPlaceholderText("")
         self.lineEdit_gpuID_predict.setObjectName("lineEdit_gpuID_predict")
         self.horizontalLayout_50.addWidget(self.lineEdit_gpuID_predict)
@@ -1740,8 +1728,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_tomo_index_predict.setFont(font)
-        self.label_tomo_index_predict.setWhatsThis("")
-        self.label_tomo_index_predict.setStyleSheet("")
+        #self.label_tomo_index_predict.setWhatsThis("")
         self.label_tomo_index_predict.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_tomo_index_predict.setObjectName("label_tomo_index_predict")
         self.horizontalLayout_34.addWidget(self.label_tomo_index_predict)
@@ -1756,7 +1743,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_tomo_index_predict.setFont(font)
-        self.lineEdit_tomo_index_predict.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_tomo_index_predict.setPlaceholderText("")
         self.lineEdit_tomo_index_predict.setObjectName("lineEdit_tomo_index_predict")
         self.horizontalLayout_34.addWidget(self.lineEdit_tomo_index_predict)
@@ -1792,7 +1779,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_pretrain_model_predict.setFont(font)
-        self.lineEdit_pretrain_model_predict.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_pretrain_model_predict.setText("")
         self.lineEdit_pretrain_model_predict.setPlaceholderText("")
         self.lineEdit_pretrain_model_predict.setObjectName("lineEdit_pretrain_model_predict")
@@ -1814,8 +1801,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_cube_size_predict.setFont(font)
-        self.label_cube_size_predict.setWhatsThis("")
-        self.label_cube_size_predict.setStyleSheet("")
+        #self.label_cube_size_predict.setWhatsThis("")
         self.label_cube_size_predict.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_cube_size_predict.setObjectName("label_cube_size_predict")
         self.horizontalLayout_55.addWidget(self.label_cube_size_predict)
@@ -1830,7 +1816,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_cube_size_predict.setFont(font)
-        self.lineEdit_cube_size_predict.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_cube_size_predict.setObjectName("lineEdit_cube_size_predict")
         self.horizontalLayout_55.addWidget(self.lineEdit_cube_size_predict)
         self.horizontalLayout_53.addLayout(self.horizontalLayout_55)
@@ -1865,7 +1851,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_result_dir_predict.setFont(font)
-        self.lineEdit_result_dir_predict.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_result_dir_predict.setText("")
         self.lineEdit_result_dir_predict.setObjectName("lineEdit_result_dir_predict")
         self.horizontalLayout_57.addWidget(self.lineEdit_result_dir_predict)
@@ -1886,8 +1872,7 @@ class Ui_MainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.label_crop_size_predict.setFont(font)
-        self.label_crop_size_predict.setWhatsThis("")
-        self.label_crop_size_predict.setStyleSheet("")
+        #self.label_crop_size_predict.setWhatsThis("")
         self.label_crop_size_predict.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_crop_size_predict.setObjectName("label_crop_size_predict")
         self.horizontalLayout_58.addWidget(self.label_crop_size_predict)
@@ -1902,7 +1887,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.lineEdit_crop_size_predict.setFont(font)
-        self.lineEdit_crop_size_predict.setStyleSheet("background-color:rgb(255, 255, 255)")
+        
         self.lineEdit_crop_size_predict.setObjectName("lineEdit_crop_size_predict")
         self.horizontalLayout_58.addWidget(self.lineEdit_crop_size_predict)
         self.horizontalLayout_56.addLayout(self.horizontalLayout_58)
@@ -1963,7 +1948,89 @@ class Ui_MainWindow(object):
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.gridLayout_12.addItem(spacerItem, 2, 0, 1, 1)
         self.tabWidget.addTab(self.tab_3, "")
-        self.gridLayout_2.addWidget(self.tabWidget, 0, 0, 1, 1)
+    
+    def setupUi(self, MainWindow):
+        MainWindow.setObjectName("MainWindow")
+        MainWindow.resize(912, 868)
+        self.mw = MainWindow
+        self.centralwidget = QtWidgets.QWidget(MainWindow)
+        self.centralwidget.setObjectName("centralwidget")
+
+        self.horizontalLayout_root = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_root.setObjectName("horizontalLayout_root")
+        #set up list widget
+        self.listWidget = QtWidgets.QListWidget(self.centralwidget)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.listWidget.sizePolicy().hasHeightForWidth())
+        self.listWidget.setSizePolicy(sizePolicy)
+        self.listWidget.setMaximumSize(QtCore.QSize(180, 16777215))
+        self.listWidget.setMinimumSize(QtCore.QSize(180, 16777215))
+        self.listWidget.setObjectName("listWidget")
+        self.horizontalLayout_root.addWidget(self.listWidget)
+        self.stackedWidget = QtWidgets.QStackedWidget(self.centralwidget)
+        self.stackedWidget.setObjectName("stackedWidget")
+        self.horizontalLayout_root.addWidget(self.stackedWidget)
+               
+
+        self.gridLayout_2 = QtWidgets.QGridLayout(self.centralwidget)
+        self.gridLayout_2.setObjectName("gridLayout_2")
+        self.gridLayout_2.addLayout(self.horizontalLayout_root, 0, 0, 1, 1)
+        
+        self.tabWidget = QtWidgets.QTabWidget(self.centralwidget)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.tabWidget.sizePolicy().hasHeightForWidth())
+        self.tabWidget.setSizePolicy(sizePolicy)
+        font = iFont(14)
+        self.tabWidget.setFont(font)
+        self.tabWidget.setToolTip("")
+        self.tabWidget.setTabPosition(QtWidgets.QTabWidget.North)
+        self.tabWidget.setTabShape(QtWidgets.QTabWidget.Triangular)
+        self.tabWidget.setIconSize(QtCore.QSize(36, 36))
+        self.tabWidget.setUsesScrollButtons(True)
+        self.tabWidget.setDocumentMode(False)
+        self.tabWidget.setTabsClosable(False)
+        self.tabWidget.setMovable(False)
+        self.tabWidget.setTabBarAutoHide(False)
+        self.tabWidget.setObjectName("tabWidget")
+
+
+
+        self.tabWidget_2 = QtWidgets.QTabWidget(self.centralwidget)
+        #self.gridLayout_2.addWidget(self.tabWidget, 0, 0, 1, 1)
+        self.stackedWidget.addWidget(self.tabWidget)
+        self.stackedWidget.addWidget(self.tabWidget_2)
+
+
+                
+        self.setupUi_Tomo()
+        self.setupUi_SPA()
+
+        # set list view connection
+        self.listWidget.currentRowChanged.connect(self.stackedWidget.setCurrentIndex)
+        # Remove the border
+        self.listWidget.setFrameShape(QListWidget.NoFrame)
+        # Hide scroll bar
+        self.listWidget.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.listWidget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        list_names = ["Tomo", "Single Particle"]
+
+        for name in list_names:
+            item = QListWidgetItem(name, self.listWidget)
+            # Set the default width and height of the item (only height is useful here)
+            item.setSizeHint(QSize(16777215, 35))
+            # Text centered
+            item.setTextAlignment(Qt.AlignCenter)
+
+        #self.listWidget.currentRowChanged.connect(self.loadLogs)
+
+
+
+
         self.textBrowser_log = QtWidgets.QTextBrowser(self.centralwidget)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         sizePolicy.setHorizontalStretch(0)
@@ -1992,8 +2059,15 @@ class Ui_MainWindow(object):
         self.menuBar.addAction(self.menuHelp.menuAction())
 
         self.retranslateUi(MainWindow)
+        self.retranslateUi_SPA()
         self.tabWidget.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
+
+    
+    def retranslateUi_SPA(self):
+        _translate = QtCore.QCoreApplication.translate
+        self.groupBox_spa_1.setTitle(_translate("MainWindow", "SPA"))
+        self.label_half_1.setText(_translate("MainWindow", "Half Map 1"))
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -2171,6 +2245,8 @@ class Ui_MainWindow(object):
         self.pushButton_predict_3dmod.setText(_translate("MainWindow", "3dmod"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_3), _translate("MainWindow", "Prediction"))
         self.textBrowser_log.setHtml(_translate("MainWindow", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
+
+
 "<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
 "p, li { white-space: pre-wrap; }\n"
 "</style></head><body style=\" font-family:\'MS Shell Dlg 2\'; font-size:11pt; font-weight:400; font-style:normal;\">\n"
@@ -2179,9 +2255,45 @@ class Ui_MainWindow(object):
         self.actionGithub.setText(_translate("MainWindow", "Github"))
 
 
+stylesheet = """
+
+QPushButton#run {
+    background: rgb(239,221,241);
+    font: 14px;
+}
+
+QGroupBox{
+    font: 12px;
+}
+
+QListWidget {
+    outline: 0px;
+    font: 14px;
+    font-weight:bold;
+    background: #e5eaf5
+}
+
+QTabWidget{
+    font: 16px;
+    background: rgb(144,160,187)
+}
+
+QWidget#tab {
+    font: 14px;
+    background: rgb(237, 240, 232)
+}
+
+QLabel{
+    font-weight: bold;
+    font: 14px;
+}
+"""
+
+
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
+    app.setStyleSheet(stylesheet)
     MainWindow = QtWidgets.QMainWindow()
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
