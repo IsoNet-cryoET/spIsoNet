@@ -3,9 +3,9 @@
 from setuptools import setup, find_packages
 
 setup(name='IsoNet',
-    version=0.3,
+    version=1.0,
     description='IsoNet isotropic reconstruction',
-    url='https://github.com/Heng-Z/IsoNet',
+    url='https://github.com/IsoNet-cryoET/IsoNet',
     license='MIT',
     packages=['IsoNet'],
     package_dir={

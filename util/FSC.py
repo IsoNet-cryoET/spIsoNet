@@ -33,7 +33,6 @@ def rotational_average(input_map):
     return FSC_curve
 
 
-
 def calculate_FSC(pixels_T, FSC_values, point_tree, r0):
     values = np.zeros(len(pixels_T[0]))
     for j, pixel in enumerate(zip(pixels_T[0], pixels_T[1], pixels_T[2])):

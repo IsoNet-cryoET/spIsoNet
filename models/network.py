@@ -157,7 +157,6 @@ def ddp_train(rank, world_size, port_number, model, data_path, batch_size, acc_b
                     avg_val_loss += val_loss
                     if rank == 0:
                         progress_bar.set_postfix({"Val_Loss": val_loss})
-                        print(val_loss)
                         progress_bar.update()                    
                     if i + 1 >= steps_per_epoch_val:
                         break
