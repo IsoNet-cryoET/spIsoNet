@@ -26,6 +26,7 @@ class MainWindowUIClass( Ui_MainWindow ):
         self.p = None
         self.previous_log_line = ""
         self.setting_file = ".isonet.setting"
+        self.setting_spa_file = ".isonet_spa.setting"
         # check for pid in last running
         #if os.path.isfile(self.model.pid_file):
         #    os.remove(self.model.pid_file)
@@ -92,6 +93,10 @@ class MainWindowUIClass( Ui_MainWindow ):
         self.button_tomo_star_predict.clicked.connect(lambda: self.browseSlot("tomo_star_predict"))
         self.button_pretrain_model_predict.clicked.connect(lambda: self.browseSlot("pretrain_model_predict"))
         self.button_continue_iter.clicked.connect(lambda: self.browseSlot("continue_from"))
+
+        self.pushButton_half_1.clicked.connect(lambda: self.browseSlot(self.lineEdit_half_1, "map"))
+        self.pushButton_half_2.clicked.connect(lambda: self.browseSlot(self.lineEdit_half_2, "map"))
+        self.pushButton_mask_spa.clicked.connect(lambda: self.browseSlot(self.lineEdit_mask_spa, "map"))
         
         self.pushButton_deconv.clicked.connect(self.deconvolve)
         self.pushButton_generate_mask.clicked.connect(self.make_mask)
@@ -99,6 +104,8 @@ class MainWindowUIClass( Ui_MainWindow ):
         self.pushButton_refine.clicked.connect(self.refine)
         self.pushButton_predict.clicked.connect(self.predict)
         self.pushButton_predict_3dmod.clicked.connect(self.view_predict_3dmod)
+
+        self.pushButton_refine_spa.clicked.connect(self.refine_spa)
 
         self.actionGithub.triggered.connect(self.openGithub)
 
@@ -125,6 +132,7 @@ class MainWindowUIClass( Ui_MainWindow ):
         self.button_continue_iter.setIcon(icon)
 
         self.read_setting()
+        self.read_setting_spa()
         
         ###Set up log file monitor###
         import datetime
@@ -304,6 +312,7 @@ class MainWindowUIClass( Ui_MainWindow ):
             "rlnMaskBoundary": "mod file (*.mod) ;; All Files (*)" 
         }
         return switcher.get(item, "Invaid file types")
+    
     def get_toolTip(self,label):
         switcher = {
             "rlnMicrographName": "Your tomogram filenames",
@@ -371,7 +380,7 @@ class MainWindowUIClass( Ui_MainWindow ):
         except:
             pass
      
-    def browseSlot( self , btn ):
+    def browseSlot( self , btn="" ):
         ''' Called when the user presses the Browse button
         '''
         lineEdit = self.switch_btn(btn)
@@ -388,6 +397,40 @@ class MainWindowUIClass( Ui_MainWindow ):
             flt = "star file (*.star);;All Files (*)"
         if btn == "pretrain_model_refine" or btn == "pretrain_model_predict":
             flt = "model file (*.h5);;All Files (*)"
+        if btn == "map":
+            flt = "mrc file (*.mrc);;rec file (*.rec);;All Files (*)"
+            
+        fileName, _ = QtWidgets.QFileDialog.getOpenFileName(
+                        None,
+                        "Choose File",
+                        "",
+                        flt,
+                        options=options)
+        if fileName:
+            #self.model.setFileName( fileName )
+            #######
+            #cmd = "echo choose file: {} >> log.txt ".format(fileName)
+            #os.system(cmd)
+            #self.logWindow.append("choose file: {}".format(fileName) )
+            simple_name = self.model.sim_path(pwd,fileName)
+            lineEdit.setText( simple_name )
+            #self.logWindow.moveCursor(QtGui.QTextCursor.End) 
+            #######
+            #self.refreshAll()
+        #self.debugPrint( "Browse button pressed" )
+    def browseSlot( self, lineEdit, type=""):
+        ''' Called when the user presses the Browse button
+        '''
+        #lineEdit = self.switch_btn(btn)
+        
+        pwd = os.getcwd().replace("\\","/")
+        
+        options = QtWidgets.QFileDialog.Options()
+        options |= QtWidgets.QFileDialog.DontUseNativeDialog
+        
+        flt = "All Files (*)"
+        if type == "map":
+            flt = "mrc file (*.mrc);;rec file (*.rec);;All Files (*)"
             
         fileName, _ = QtWidgets.QFileDialog.getOpenFileName(
                         None,
@@ -507,7 +550,6 @@ class MainWindowUIClass( Ui_MainWindow ):
         else:
             self.start_process(cmd,self.pushButton_generate_mask)
 
-
     def extract_subtomo( self ):
         tomogram_star = self.model.tomogram_star
 
@@ -530,9 +572,7 @@ class MainWindowUIClass( Ui_MainWindow ):
         else:
             self.start_process(cmd,self.pushButton_extract)
 
-
     def refine( self ):
-
         subtomo_star = self.lineEdit_subtomo_star_refine.text() if self.lineEdit_subtomo_star_refine.text() else "subtomo.star"
 
         cmd = "isonet.py refine {} ".format(subtomo_star)
@@ -772,6 +812,80 @@ class MainWindowUIClass( Ui_MainWindow ):
             except:
                 print("error reading {}!".format(self.setting_file))
 
+    def refine_spa(self):
+        
+        self.save_setting_spa()
+
+        cmd = "isonet.py map_refine"
+
+        if self.lineEdit_half_1.text():
+            cmd = "{} {}".format(cmd, self.lineEdit_half_1.text())
+        else:
+            print("Please provide half 1 map!")
+
+        if self.lineEdit_half_2.text():
+            cmd = "{} --i2 {}".format(cmd, self.lineEdit_half_2.text())
+        
+        if self.lineEdit_mask_spa.text():
+            cmd = "{} --mask_file {}".format(cmd, self.lineEdit_mask_spa.text())
+
+        if self.lineEdit_gpuID_spa.text():
+            cmd = "{} --gpuID {}".format(cmd, self.lineEdit_gpuID_spa.text())
+
+        if self.lineEdit_cpus_spa.text():
+            cmd = "{} --ncpus {}".format(cmd, self.lineEdit_cpus_spa.text())
+
+        if self.lineEdit_outputDir_spa.text():
+            cmd = "{} --output_dir {}".format(cmd, self.lineEdit_outputDir_spa.text())
+
+        if self.lineEdit_limit_res.text():
+            cmd = "{} --limit_res {}".format(cmd, self.lineEdit_limit_res.text())
+
+        if self.lineEdit_fsc_filename.text():
+            cmd = "{} --fsc_file {}".format(cmd, self.lineEdit_fsc_filename.text())
+
+        if self.lineEdit_cone_sampling_angle.text():
+            cmd = "{} --cone_sampling_angle {}".format(cmd, self.lineEdit_cone_sampling_angle.text())
+
+        if self.lineEdit_iteration_spa.text():
+            cmd = "{} --iterations {}".format(cmd, self.lineEdit_iteration_spa.text())
+
+        if self.lineEdit_epoch_spa.text():
+            cmd = "{} --epochs {}".format(cmd, self.lineEdit_epoch_spa.text())
+
+        if self.lineEdit_n_subvolume_spa.text():
+            cmd = "{} --n_subvolume {}".format(cmd, self.lineEdit_n_subvolume_spa.text())
+
+        if self.lineEdit_crop_size_spa.text():
+            cmd = "{} --crop_size {}".format(cmd, self.lineEdit_crop_size_spa.text())
+
+        if self.lineEdit_cube_size_spa.text():
+            cmd = "{} --cube_size {}".format(cmd, self.lineEdit_cube_size_spa.text())
+
+        if self.lineEdit_predict_crop_size_spa.text():
+            cmd = "{} --predict_crop_size {}".format(cmd, self.lineEdit_predict_crop_size_spa.text())
+
+        if self.lineEdit_iteration_spa.text():
+            cmd = "{} --iterations {}".format(cmd, self.lineEdit_iteration_spa.text())
+
+        if self.checkBox_mixed_precision_spa.isChecked():
+            cmd = "{} --mixed_precision True".format(cmd)
+
+        if self.lineEdit_batch_size_spa.text():
+            cmd = "{} --batch_size {}".format(cmd, self.lineEdit_batch_size_spa.text())
+        
+        if self.lineEdit_acc_batches_spa.text():
+            cmd = "{} --acc_batches {}".format(cmd, self.lineEdit_acc_batches_spa.text())
+
+        if self.lineEdit_learning_rate_spa.text():
+            cmd = "{} --learning_rate {}".format(cmd, self.lineEdit_learning_rate_spa.text())
+        
+        
+        if self.checkBox_only_print_command_refine_spa.isChecked() and self.pushButton_refine_spa.text() == 'Refine':
+            print(cmd)
+        else:
+            self.start_process(cmd, self.pushButton_refine_spa)
+
     def save_setting(self):
         param = {}
         param['deconv_dir'] = self.lineEdit_deconv_dir.text()
@@ -835,6 +949,64 @@ class MainWindowUIClass( Ui_MainWindow ):
 
         try:
             with open(self.setting_file, 'w') as f: 
+                for key, value in param.items(): 
+                    f.write("{}:{}\n".format(key,value))
+        except:
+            print("error writing {}!".format(self.setting_file))
+    
+    def read_setting_spa(self):
+        if os.path.exists(self.setting_spa_file):
+            data = {}
+            try:
+                with open(self.setting_spa_file) as f:
+                    for line in f:
+                        (k, v) = line.split(":")
+                        data[k] = v.strip()
+                self.lineEdit_half_1.setText(data['lineEdit_half_1'])
+                self.lineEdit_half_2.setText(data['lineEdit_half_2'])
+                self.lineEdit_mask_spa.setText(data['lineEdit_mask_spa'])
+                self.lineEdit_gpuID_spa.setText(data['lineEdit_gpuID_spa'])
+                self.lineEdit_outputDir_spa.setText(data['lineEdit_outputDir_spa'])
+                self.lineEdit_limit_res.setText(data['lineEdit_limit_res'])
+                self.lineEdit_fsc_filename.setText(data['lineEdit_fsc_filename'])
+                self.lineEdit_cone_sampling_angle.setText(data['lineEdit_cone_sampling_angle'])
+                self.lineEdit_iteration_spa.setText(data['lineEdit_iteration_spa'])
+                self.lineEdit_epoch_spa.setText(data['lineEdit_epoch_spa'])
+                self.lineEdit_n_subvolume_spa.setText(data['lineEdit_n_subvolume_spa'])
+                self.lineEdit_crop_size_spa.setText(data['lineEdit_crop_size_spa'])
+                self.lineEdit_cube_size_spa.setText(data['lineEdit_cube_size_spa'])
+                self.lineEdit_predict_crop_size_spa.setText(data['lineEdit_predict_crop_size_spa'])
+                self.lineEdit_batch_size_spa.setText(data['lineEdit_batch_size_spa'])
+                self.lineEdit_acc_batches_spa.setText(data['lineEdit_acc_batches_spa'])
+                self.lineEdit_learning_rate_spa.setText(data['lineEdit_learning_rate_spa'])
+                self.checkBox_mixed_precision_spa.setChecked(data['checkBox_mixed_precision_spa'] == 'True')
+            except:
+                print("error reading {}!".format(self.setting_spa_file))
+
+    def save_setting_spa(self):
+        param = {}
+        param['lineEdit_half_1'] = self.lineEdit_half_1.text()
+        param['lineEdit_half_2'] = self.lineEdit_half_2.text()
+        param['lineEdit_mask_spa'] = self.lineEdit_mask_spa.text()
+        param['lineEdit_gpuID_spa'] = self.lineEdit_gpuID_spa.text()
+        param['lineEdit_outputDir_spa'] = self.lineEdit_outputDir_spa.text()
+        param['lineEdit_limit_res'] = self.lineEdit_limit_res.text()
+        param['lineEdit_fsc_filename'] = self.lineEdit_fsc_filename.text()
+        param['lineEdit_cone_sampling_angle'] = self.lineEdit_cone_sampling_angle.text()
+        param['lineEdit_iteration_spa'] = self.lineEdit_iteration_spa.text()
+        param['lineEdit_epoch_spa'] = self.lineEdit_epoch_spa.text()
+        param['lineEdit_n_subvolume_spa'] = self.lineEdit_n_subvolume_spa.text()
+        param['lineEdit_crop_size_spa'] = self.lineEdit_crop_size_spa.text()
+        param['lineEdit_cube_size_spa'] = self.lineEdit_cube_size_spa.text()
+        param['lineEdit_predict_crop_size_spa'] = self.lineEdit_predict_crop_size_spa.text()
+        param['lineEdit_batch_size_spa'] = self.lineEdit_batch_size_spa.text()
+        param['lineEdit_acc_batches_spa'] = self.lineEdit_acc_batches_spa.text()
+        param['lineEdit_learning_rate_spa'] = self.lineEdit_learning_rate_spa.text()
+        param['checkBox_mixed_precision_spa'] = self.checkBox_mixed_precision_spa.isChecked()
+
+
+        try:
+            with open(self.setting_spa_file, 'w') as f: 
                 for key, value in param.items(): 
                     f.write("{}:{}\n".format(key,value))
         except:
