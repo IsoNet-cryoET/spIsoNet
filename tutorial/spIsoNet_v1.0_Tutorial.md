@@ -29,6 +29,24 @@ The environment we verified are:
 ## 2. Quick run
 
 The default parameter in IsoNet should be suitable for most cases, you can also train with a larger epochs or more iterations to get better result. 
+### 2.0 prepare data set
+The tutorial data can be downloaded on google drive
+The data contains a two half maps:xxx  and a solvent mask xxx.
+
+
+### 2.1. make 3D FSC
+
+The algorithum for 3D FSC is based on
+Tan, Y.Z., Baldwin, P.R., Davis, J.H., Williamson, J.R., Potter, C.S., Carragher, B. and Lyumkis, D., 2017. Addressing preferred specimen orientation in single-particle cryo-EM through tilting. Nature methods, 14(8), p.793.
+
+This 3D FSC reimplementation in single particle IsoNet should be faster than the origional version. The 3DFSC volume should be renerated in few seconsds.
+
+The input of 3D FSC calculation are two half maps and a solvent mask
+``` {.bash language="bash"}
+isonet.py fsc3d half1.mrc half2.mrc mask.mrc
+```
+
+### 2.1. correction of the 
 You can use
 ``` {.bash language="bash"}
 isonet.py map_refine --help
@@ -98,3 +116,9 @@ Epoch [5/5], Train Loss: 0.2612, Validataion Loss: 0.2649
         """
 
 ## 3 example dataset
+
+## 4 run single particle IsoNet step by step
+This session is not necessary but it might be good for diasgniostic purpose or you want to continue from previous runs.
+
+### 4.1 generate 3D FSC volume 
+This step generate the 3DFSC volume from two maps.

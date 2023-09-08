@@ -2522,7 +2522,7 @@ class Ui_MainWindow(object):
             Size of the minibatch. If None, batch_size will be the max(2 * number_of_gpu,4). batch_size should be divisible by the number of gpu. </span></p><p><span style=\" font-size:9pt;\"><br/></span></p></body></html>"))
         self.lineEdit_batch_size_spa.setPlaceholderText(_translate("MainWindow", "None"))
 
-        self.label_acc_batches_spa.setText(_translate("MainWindow", "Accumulate Batch Size"))
+        self.label_acc_batches_spa.setText(_translate("MainWindow", "Accumulate batches"))
         self.lineEdit_acc_batches_spa.setToolTip(_translate("MainWindow", "<html><head/><body><p><span style=\" font-size:9pt;\">\
             If this value is set to 2 (or more), accumulate gradiant will be used to save memory consumption. </span></p><p><span style=\" font-size:9pt;\"><br/></span></p></body></html>"))
         self.lineEdit_acc_batches_spa.setPlaceholderText(_translate("MainWindow", "1"))

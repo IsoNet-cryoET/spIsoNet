@@ -4,6 +4,32 @@ import torch
 from torch.utils.data.dataset import Dataset
 import mrcfile
 from IsoNet.preprocessing.img_processing import normalize
+
+class Train_sets_sp(Dataset):
+    def __init__(self, data_dir, max_length = None, shuffle=True, prefix = "train"):
+        super(Train_sets_sp, self).__init__()
+        # self.path_all = []
+        p = '{}/'.format(data_dir)
+        self.path_all = sorted([p+f for f in os.listdir(p)])
+
+        # if shuffle:
+        #     zipped_path = list(zip(self.path_all[0],self.path_all[1]))
+        #     np.random.shuffle(zipped_path)
+        #     self.path_all[0], self.path_all[1] = zip(*zipped_path)
+        # print(self.path_all)
+        #if max_length is not None:
+        #    if max_length < len(self.path_all):
+
+
+    def __getitem__(self, idx):
+        with mrcfile.open(self.path_all[idx]) as mrc:
+            rx = mrc.data[np.newaxis,:,:,:]
+        rx = torch.as_tensor(rx.copy())
+        return rx
+
+    def __len__(self):
+        return len(self.path_all)
+
 class Train_sets(Dataset):
     def __init__(self, data_dir, max_length = None, shuffle=True, prefix = "train"):
         super(Train_sets, self).__init__()

@@ -379,24 +379,21 @@ class ISONET:
         run(d_args)
 
     def map_refine(self, 
-                   i: str,
-                   i2: str=None, 
-                   mask_file: str=None, 
+                   input: str,
+                   aniso_file: str, 
+                   mask: str=None, 
+
                    gpuID: str="0", 
+                   alpha: float=1,
                    ncpus: int=16, 
                    output_dir: str="isonet_maps",
-                   power: float = 4.0, 
-                   limit_res: float=None, 
-                   fsc_file: str=None, 
-                   cone_sampling_angle: float=10,
-                   iterations: int=10,
-                   epochs: int=5,
+                   pretrained_model: str=None,
+
+                   epochs: int=10,
                    threshold: float=None, 
-                   n_subvolume: int=40, 
-                   crop_size: int=96, 
-                   cube_size: int=80,
-                   predict_crop_size: int=128,
-                   mixed_precision: bool=True,
+                   n_subvolume: int=100, 
+                   cube_size: int=64,
+                   predict_crop_size: int=80,
                    batch_size: int=None, 
                    acc_batches: int=1,
                    learning_rate: float=3e-4
@@ -405,30 +402,39 @@ class ISONET:
         """
         \ntrain neural network to correct preffered orientation\n
         isonet.py map_refine half1.mrc half2.mrc mask.mrc [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
-        :param i: Input name of half1
-        :param i2: Input name of half2
+        :param input: Input name of half1
         :param mask_file: Filename of a user-provided mask
         :param gpuID: The ID of gpu to be used during the training.
         :param ncpus: Number of cpu.
         :param output_dir: The name of directory to save output maps
         :param limit_res: The resolution limit for recovery, default is the resolution of the map.
-        :param power: modulate FSC file to FSC^power. Generatlly how much information you want to recover. 0 means do not change the input map. Values larger than 1 will put less weight to the origional map.
+        :param weight: Weight ratio between the predicted and the origional map, only used after the last iteration. Multiple values seperating with commas will generate multiple half maps.
         :param fsc_file: 3DFSC file if not set, isonet will generate one.
         :param cone_sampling_angle: Angle for 3D fsc sampling for IsoNet generated 3DFSC. IsoNet default is 10 degrees, the default for official 3DFSC is 20 degrees.
-        :param iterations: Number of iterations.
         :param epochs: Number of epochs for each iteration. This value can be increase (maybe to 10) to get (maybe) better result.
         :param threshold: Threshold to make 3DFSC volume binary. We usually do not use it.  
         :param n_subvolume: Number of subvolumes 
         :param crop_size: The size of subvolumes, should be larger then the cube_size
-        :param cube_size: Size of cubes for training, should be divisible by 16, eg. 32, 64.
+        :param cube_size: Size of cubes for training, should be divisible by 16, e.g. 32, 64, 80.
         :param mixed_precision: This option will greatly speed up the training and reduce VRAM consumption, often doubling the speed for GPU with tensor cores. If you find that this option does not improve speed, there might be a mismatch for cuda/cudnn/pytorch versions.
         :param batch_size: Size of the minibatch. If None, batch_size will be the max(2 * number_of_gpu,4). batch_size should be divisible by the number of gpu.
         :param acc_batches: If this value is set to 2 (or more), accumulate gradiant will be used to save memory consumption.  
         :param learning_rate: learning rate. Default learning rate is xx while previous IsoNet tomography used 3e-4 as learning rate
         """
+        #TODO
+        #mixed precision does not work for torch.FFT
+        mixed_precision = False
+
+        from IsoNet.util.utils import mkfolder
+        from IsoNet.preprocessing.img_processing import normalize
+        from IsoNet.bin.map_refine import map_refine
+        from IsoNet.util.utils import process_gpuID
+        from multiprocessing import cpu_count
+        import mrcfile
+        import numpy as np
+
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
             ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])   
-        from IsoNet.util.utils import process_gpuID
         ngpus, gpuID, gpuID_list = process_gpuID(gpuID)
 
         os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
@@ -440,99 +446,39 @@ class ISONET:
             else:
                 batch_size = 2 * len(gpuID_list)
 
-        from multiprocessing import cpu_count
         cpu_system = cpu_count()
         if cpu_system < ncpus:
             logging.info("requested number of cpus is more than the number of the cpu cores in the system")
             logging.info(f"setting ncpus to {cpu_system}")
             ncpus = cpu_system
-        from IsoNet.util.utils import mkfolder
-        from IsoNet.preprocessing.img_processing import normalize
 
-        mkfolder(output_dir)
-        
-        import mrcfile
-        import numpy as np
-        with mrcfile.open(i, 'r') as mrc:
-            half1 = normalize(mrc.data,percentile=False)
+        mkfolder(output_dir,remove=False)
+
+        output_base = input.split('/')[-1]
+        output_base = output_base.split('.')[:-1]
+        output_base = "".join(output_base)
+
+        with mrcfile.open(input, 'r') as mrc:
+            half_map = normalize(mrc.data,percentile=False)
             voxel_size = mrc.voxel_size.x
             if voxel_size == 0:
                 voxel_size = 1
-
-        if i2 is None:
-            logging.warning("Only one half map is provided. Please consider providing half map 2")
-        else:
-            with mrcfile.open(i2, 'r') as mrc:
-                half2 = normalize(mrc.data,percentile=False)
-
-        if mask_file is None:
-            mask = np.ones(half1.shape, dtype = np.float32)
-            logging.warning("No mask is provided, please consider providing a soft mask")
-        else:
-            with mrcfile.open(mask_file, 'r') as mrc:
-                mask = mrc.data
-
-        from IsoNet.util.FSC import get_FSC_map, ThreeD_FSC
-        if limit_res is None:
-            FSC_map = get_FSC_map([half1, half2], mask)
-            from IsoNet.bin.map_refine import recommended_resolution
-            limit_res = recommended_resolution(FSC_map, voxel_size, threshold=0.143)
-            logging.info("Global resolution at FSC={} is {}".format(0.143, limit_res))
-        else:
-            FSC_map = None
-
-        logging.info("Limit resolution to {} for IsoNet missing information recovery. You can also tune this paramerter with --limit_res .".format(limit_res))
-        
-        if fsc_file is not None:
-            with mrcfile.open(fsc_file, 'r') as mrc:
-                fsc3d = mrc.data
-        else:
-            logging.info("calculating fast 3DFSC, this will take few minutes")
-            if FSC_map is None:
-                FSC_map = get_FSC_map([half1, half2], mask)
-            limit_r = int( (2.*voxel_size) / limit_res * (half1.shape[0]/2.) + 1)
-            fsc3d = ThreeD_FSC(FSC_map, limit_r,angle=float(cone_sampling_angle), n_processes=ncpus)
-            with mrcfile.new(f"{output_dir}/3DFSC.mrc", overwrite=True) as mrc:
-                mrc.set_data(fsc3d.astype(np.float32))
         logging.info("voxel_size {}".format(voxel_size))
 
-        fsc3d = fsc3d**power
-        nz,ny,nx = fsc3d.shape
-        r = np.arange(nz)-nz//2
-
-        [Z,Y,X] = np.meshgrid(r,r,r)
-        index = np.round(np.sqrt(Z**2+Y**2+X**2))
-        from copy import deepcopy
-        fsc3d_copy = deepcopy(fsc3d)
-        for i in range(nz//2):
-            FSC_MAX = np.max(fsc3d[index==i])
-            fsc3d_copy[index==i] = fsc3d[index==i]/ (FSC_MAX + 1e-4)
-        fsc3d = fsc3d_copy
-        with mrcfile.new(f"{output_dir}/3DFSC_powered.mrc", overwrite=True) as mrc:
-            mrc.set_data(fsc3d.astype(np.float32))
-         
-        from IsoNet.bin.map_refine import map_refine
-        if i2 is not None:
-            diff_map = half1-half2
-            noise_scale = np.std(diff_map[mask>0])/1.414
-            logging.info(f"noise_scale: {noise_scale}")
+        if mask is None:
+            mask_vol = np.ones(half_map.shape, dtype = np.float32)
+            logging.warning("No mask is provided, please consider providing a soft mask")
         else:
-            noise_scale = 0
+            with mrcfile.open(mask, 'r') as mrc:
+                mask_vol = mrc.data
 
-        logging.info("processing half map1")
-        map_refine(half1, mask, fsc3d, threshold=threshold, voxel_size=voxel_size, output_dir=output_dir, 
-                   output_base="half1",  limit_res=limit_res, iterations=iterations, mixed_precision=mixed_precision, epochs = epochs,
-                   n_subvolume=n_subvolume, cube_size=cube_size, crop_size=crop_size, noise_scale=noise_scale,
+        with mrcfile.open(aniso_file, 'r') as mrc:
+            fsc3d = mrc.data
+
+        map_refine(half_map, mask_vol, fsc3d, threshold=threshold,alpha = alpha,  voxel_size=voxel_size, output_dir=output_dir, 
+                   output_base=output_base, mixed_precision=mixed_precision, epochs = epochs,
+                   n_subvolume=n_subvolume, cube_size=cube_size, pretrained_model=pretrained_model,
                    batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size,gpuID=gpuID, learning_rate=learning_rate)
-        if i2 is not None:
-            logging.info("processing half map2")
-            map_refine(half2, mask, fsc3d, threshold=threshold, voxel_size=voxel_size, output_dir=output_dir,
-                        output_base="half2", limit_res = limit_res, iterations=iterations, mixed_precision=mixed_precision, epochs = epochs,
-                        n_subvolume=n_subvolume, cube_size=cube_size, crop_size=crop_size, noise_scale=noise_scale,
-                        batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size,gpuID=gpuID, learning_rate = learning_rate)
-            logging.info("Two independent half maps are saved in {}. Please use other software for postprocessing and try difference B factors".format(output_dir))
-        else:
-            logging.info("Corrected maps are saved in {}. ".format(output_dir))
         
         logging.info("removing intermediate files")
         files = os.listdir(output_dir)
@@ -541,33 +487,19 @@ class ISONET:
             if item == "data" or item == "data~":
                 path = f'{output_dir}/{item}'
                 shutil.rmtree(path)
-            if item.startswith('subvolume'):
+            if item.startswith('subvolume') or item == "tmp.npy":
                 path = f'{output_dir}/{item}'
                 os.remove(path)
         logging.info("Finished")
 
-    def FSC(self, 
+    def fsc3d(self, 
                    i: str,
-                   i2: str=None, 
-                   mask_file: str=None, 
-                   gpuID: str="0", 
+                   i2: str, 
+                   mask: str=None, 
+                   o: str="FSC3D.mrc",
                    ncpus: int=16, 
-                   output_dir: str="isonet_test",
-                   power: float = 2.0, 
                    limit_res: float=None, 
-                   fsc_file: str=None, 
                    cone_sampling_angle: float=10,
-                   iterations: int=10,
-                   epochs: int=5,
-                   threshold: float=None, 
-                   n_subvolume: int=40, 
-                   crop_size: int=96, 
-                   cube_size: int=80,
-                   predict_crop_size: int=128,
-                   mixed_precision: bool=True,
-                   batch_size: int=None, 
-                   acc_batches: int=1,
-                   learning_rate: float=3e-4
                    ):
 
         """
@@ -576,109 +508,60 @@ class ISONET:
         :param i: Input name of half1
         :param i2: Input name of half2
         :param mask_file: Filename of a user-provided mask
-        :param gpuID: The ID of gpu to be used during the training.
         :param ncpus: Number of cpu.
-        :param output_dir: The name of directory to save output maps
         :param limit_res: The resolution limit for recovery, default is the resolution of the map.
-        :param power: modulate FSC file to FSC^power. Generatlly how much information you want to recover. 0 means do not change the input map. Values larger than 1 will put less weight to the origional map.
         :param fsc_file: 3DFSC file if not set, isonet will generate one.
         :param cone_sampling_angle: Angle for 3D fsc sampling for IsoNet generated 3DFSC. IsoNet default is 10 degrees, the default for official 3DFSC is 20 degrees.
-        :param iterations: Number of iterations.
-        :param epochs: Number of epochs for each iteration. This value can be increase (maybe to 10) to get (maybe) better result.
-        :param threshold: Threshold to make 3DFSC volume binary. We usually do not use it.  
-        :param n_subvolume: Number of subvolumes 
-        :param crop_size: The size of subvolumes, should be larger then the cube_size
-        :param cube_size: Size of cubes for training, should be divisible by 16, eg. 32, 64.
-        :param mixed_precision: This option will greatly speed up the training and reduce VRAM consumption, often doubling the speed for GPU with tensor cores. If you find that this option does not improve speed, there might be a mismatch for cuda/cudnn/pytorch versions.
-        :param batch_size: Size of the minibatch. If None, batch_size will be the max(2 * number_of_gpu,4). batch_size should be divisible by the number of gpu.
-        :param acc_batches: If this value is set to 2 (or more), accumulate gradiant will be used to save memory consumption.  
-        :param learning_rate: learning rate. Default learning rate is xx while previous IsoNet tomography used 3e-4 as learning rate
         """
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
             ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])   
-        from IsoNet.util.utils import process_gpuID
-        ngpus, gpuID, gpuID_list = process_gpuID(gpuID)
 
-        os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-        os.environ["CUDA_VISIBLE_DEVICES"]=gpuID
-
-        if batch_size is None:
-            if ngpus == 1:
-                batch_size = 4
-            else:
-                batch_size = 2 * len(gpuID_list)
-
+        from IsoNet.preprocessing.img_processing import normalize
+        import numpy as np
         from multiprocessing import cpu_count
+        import mrcfile
+
+        from IsoNet.util.FSC import get_FSC_map, ThreeD_FSC, recommended_resolution
+
         cpu_system = cpu_count()
         if cpu_system < ncpus:
             logging.info("requested number of cpus is more than the number of the cpu cores in the system")
             logging.info(f"setting ncpus to {cpu_system}")
             ncpus = cpu_system
-        from IsoNet.util.utils import mkfolder
-        from IsoNet.preprocessing.img_processing import normalize
 
-        mkfolder(output_dir)
-        
-        import mrcfile
-        import numpy as np
         with mrcfile.open(i, 'r') as mrc:
             half1 = normalize(mrc.data,percentile=False)
             voxel_size = mrc.voxel_size.x
             if voxel_size == 0:
                 voxel_size = 1
 
-        if i2 is None:
-            logging.warning("Only one half map is provided. Please consider providing half map 2")
-        else:
-            with mrcfile.open(i2, 'r') as mrc:
-                half2 = normalize(mrc.data,percentile=False)
+        with mrcfile.open(i2, 'r') as mrc:
+            half2 = normalize(mrc.data,percentile=False)
 
-        if mask_file is None:
-            mask = np.ones(half1.shape, dtype = np.float32)
+
+        if mask is None:
+            mask_vol = np.ones(half1.shape, dtype = np.float32)
             logging.warning("No mask is provided, please consider providing a soft mask")
         else:
-            with mrcfile.open(mask_file, 'r') as mrc:
-                mask = mrc.data
+            with mrcfile.open(mask, 'r') as mrc:
+                mask_vol = mrc.data
 
-        from IsoNet.util.FSC import get_FSC_map, ThreeD_FSC
+        FSC_map = get_FSC_map([half1, half2], mask_vol)
         if limit_res is None:
-            FSC_map = get_FSC_map([half1, half2], mask)
-            from IsoNet.bin.map_refine import recommended_resolution
             limit_res = recommended_resolution(FSC_map, voxel_size, threshold=0.143)
             logging.info("Global resolution at FSC={} is {}".format(0.143, limit_res))
-        else:
-            FSC_map = None
 
-        logging.info("Limit resolution to {} for IsoNet missing information recovery. You can also tune this paramerter with --limit_res .".format(limit_res))
-        
-        if fsc_file is not None:
-            with mrcfile.open(fsc_file, 'r') as mrc:
-                fsc3d = mrc.data
-        else:
-            logging.info("calculating fast 3DFSC, this will take few minutes")
-            if FSC_map is None:
-                FSC_map = get_FSC_map([half1, half2], mask)
-            limit_r = int( (2.*voxel_size) / limit_res * (half1.shape[0]/2.) + 1)
-            fsc3d = ThreeD_FSC(FSC_map, limit_r,angle=float(cone_sampling_angle), n_processes=ncpus)
-            with mrcfile.new(f"{output_dir}/3DFSC.mrc", overwrite=True) as mrc:
-                mrc.set_data(fsc3d.astype(np.float32))
+        limit_r = int( (2.*voxel_size) / limit_res * (half1.shape[0]/2.) + 1)
+        logging.info("Limit resolution to {} for IsoNet 3D calculation. You can also tune this paramerter with --limit_res .".format(limit_res))
+
+        logging.info("calculating fast 3DFSC, this will take few minutes")
+        fsc3d = ThreeD_FSC(FSC_map, limit_r,angle=float(cone_sampling_angle), n_processes=ncpus)
+
+        with mrcfile.new(o, overwrite=True) as mrc:
+            mrc.set_data(fsc3d.astype(np.float32))
         logging.info("voxel_size {}".format(voxel_size))
 
-        fsc3d = fsc3d**power
-        nz,ny,nx = fsc3d.shape
-        r = np.arange(nz)-nz//2
 
-        [Z,Y,X] = np.meshgrid(r,r,r)
-        index = np.round(np.sqrt(Z**2+Y**2+X**2))
-        from copy import deepcopy
-        fsc3d_copy = deepcopy(fsc3d)
-        for i in range(nz//2):
-            FSC_MAX = np.max(fsc3d[index==i])
-            print(FSC_MAX)
-            fsc3d_copy[index==i] = fsc3d[index==i]/ (FSC_MAX + 1e-4)
-
-        with mrcfile.new(f"{output_dir}/3DFSC_powered.mrc", overwrite=True) as mrc:
-            mrc.set_data(fsc3d_copy.astype(np.float32))
          
 
 

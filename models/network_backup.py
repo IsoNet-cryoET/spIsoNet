@@ -3,7 +3,7 @@ import numpy as np
 from .unet import Unet
 import torch
 import os
-from .data_sequence import Train_sets_sp, Predict_sets
+from .data_sequence import get_datasets, Predict_sets
 import mrcfile
 from IsoNet.preprocessing.img_processing import normalize
 import torch.nn as nn
@@ -13,7 +13,6 @@ import sys
 from tqdm import tqdm
 import socket
 import copy
-import random
 
 import torch.multiprocessing as mp
 from torch.utils.data.distributed import DistributedSampler
@@ -28,15 +27,8 @@ def find_unused_port():
     sock.close()
     return port
 
-def ddp_train(rank, world_size, port_number, model,alpha, data_path, batch_size, acc_batches, epochs, steps_per_epoch, learning_rate, mixed_precision, model_path, fsc3d):
-    rotation_list_24 = [(((0,1),1),((0,2),0)), (((0,1),1),((0,2),1)), (((0,1),1),((0,2),2)), (((0,1),1),((0,2),3)), 
-                    (((0,1),3),((0,2),0)), (((0,1),3),((0,2),1)), (((0,1),3),((0,2),2)), (((0,1),3),((0,2),3)), 
-                    (((1,2),1),((0,2),0)), (((1,2),1),((0,2),1)), (((1,2),1),((0,2),2)), (((1,2),1),((0,2),3)), 
-                    (((1,2),3),((0,2),0)), (((1,2),3),((0,2),1)), (((1,2),3),((0,2),2)), (((1,2),3),((0,2),3)), 
+def ddp_train(rank, world_size, port_number, model, data_path, batch_size, acc_batches, epochs, steps_per_epoch, learning_rate, mixed_precision, model_path):
 
-                    (((0,1),0),((0,2),0)), (((0,1),0),((0,2),1)), (((0,1),0),((0,2),2)), (((0,1),0),((0,2),3)), 
-                    (((0,1),2),((0,2),0)), (((0,1),2),((0,2),1)), (((0,1),2),((0,2),2)), (((0,1),2),((0,2),3))]
-    
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = port_number
     #os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
@@ -46,96 +38,95 @@ def ddp_train(rank, world_size, port_number, model,alpha, data_path, batch_size,
     batch_size = batch_size // acc_batches
     batch_size_gpu = batch_size // world_size
 
+    # The following take longer time at the beginning of the training. 
+    torch.backends.cudnn.benchmark = True
+    
+    # Which one of the following lines should go first
     model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
-    model = model.cuda()
+    #model = model.to(memory_format=torch.channels_last)
+    model = model.cuda()#.to(rank)
 
     model = DDP(model, device_ids=[rank])
     if torch.__version__ >= "2.0.0":
         GPU_capability = torch.cuda.get_device_capability()
         if GPU_capability[0] >= 7:
             print(GPU_capability)
+        #torch._dynamo.config.verbose = True
             torch.set_float32_matmul_precision('high')
             model = torch.compile(model)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     #torch.backends.cuda.matmul.allow_tf32 = True
     #torch.backends.cudnn.allow_tf32 = True
-
+    print(mixed_precision)
     if mixed_precision:
         scaler = torch.cuda.amp.GradScaler()
     
     #from chatGPT: The DistributedSampler shuffles the indices of the entire dataset, not just the portion assigned to a specific GPU. 
-    train_dataset = Train_sets_sp(data_path)
+
+    train_dataset, val_dataset = get_datasets(data_path)
+
     train_sampler = DistributedSampler(train_dataset, shuffle=True, drop_last=True)
+    val_sampler = DistributedSampler(val_dataset, shuffle=True,drop_last=True)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size_gpu, persistent_workers=True,
                                              num_workers=4, pin_memory=True, sampler=train_sampler)
 
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size_gpu, persistent_workers=True,
+                                             pin_memory=True, num_workers=4, sampler=val_sampler)
 
-    steps_per_epoch_train = steps_per_epoch
-    total_steps = min(len(train_loader)//acc_batches, steps_per_epoch)
+
+
+    steps_per_epoch_val = max(int(steps_per_epoch*0.1), 1)
+    steps_per_epoch_train = steps_per_epoch - steps_per_epoch_val
+    total_steps = min(len(train_loader)//acc_batches+len(val_loader), steps_per_epoch)
+    #total_steps = 1000
     average_loss_list = []
+    avg_val_loss_list = []
     loss_fn = nn.L1Loss()
-    mw = torch.from_numpy(fsc3d).cuda()
-    mwshift = torch.fft.fftshift(mw)
     for epoch in range(epochs):
+        #torch.cuda.empty_cache()
         train_sampler.set_epoch(epoch)
+        val_sampler.set_epoch(epoch)
         with tqdm(total=total_steps, unit="batch", disable=(rank!=0)) as progress_bar:
             model.train()
             # have to convert to tensor because reduce needed it
             average_loss = torch.tensor(0, dtype=torch.float).to(rank)
             for i, batch in enumerate(train_loader):
-                x = batch
-                x = x.cuda()
+                # from chatgpt: torch.cuda.empty_cache() will not clear or reset the optimizer's state.
+                #torch.cuda.empty_cache()
+                #time1 = time.time()
+                x, y = batch
+                x = x.cuda()#to(rank, non_blocking=True)
+                y = y.cuda()#to(rank, non_blocking=True)
                 optimizer.zero_grad(set_to_none=True)
                 if mixed_precision:
                     with torch.cuda.amp.autocast():
                         preds = model(x)
-                    with torch.cuda.amp.autocast(dtype=torch.float32):
-                        data = torch.zeros_like(preds)
-                        for i,d in enumerate(preds):
-                            data[i][0] = torch.real(torch.fft.ifftn(mwshift*torch.fft.fftn(d[0])))#.astype(np.float32)
-                        loss_consistency = loss_fn(data,x)
-                        data_rot = torch.zeros_like(preds)
-                        data_e = torch.zeros_like(preds)
-                        for j,d in enumerate(preds):
-                            rot = random.choice(rotation_list_24)
-                            tmp = torch.rot90(d[0],rot[0][1],rot[0][0])
-                            data_rot[j][0] = torch.rot90(tmp,rot[1][1],rot[1][0])
-                            data_e[j][0] = torch.real(torch.fft.ifftn(mwshift*torch.fft.fftn(data_rot[j][0])))#+noise[i][0]#.astype(np.float32)
-                    with torch.cuda.amp.autocast():
-                        pred_y = model(data_e)
-                        loss_equivariance = loss_fn(pred_y, data_rot)
-                        loss = alpha*loss_equivariance + loss_consistency
+                        #time2 = time.time()
+                        loss = loss_fn(preds, y)
                         loss = loss / acc_batches
+                        #time3 = time.time()
+                    
                     scaler.scale(loss).backward()
+                    #time4 = time.time()
                 else:
                     preds = model(x)
-
-                    data = torch.zeros_like(preds)
-                    for j,d in enumerate(preds):
-                        data[j][0] = torch.real(torch.fft.ifftn(mwshift*torch.fft.fftn(d[0])))#.astype(np.float32)
-                    loss_consistency = loss_fn(data,x)
-                   
-                    data_rot = torch.zeros_like(preds)
-                    data_e = torch.zeros_like(preds)
-                    for k,d in enumerate(preds):
-                        rot = random.choice(rotation_list_24)
-                        tmp = torch.rot90(d[0],rot[0][1],rot[0][0])
-                        data_rot[k][0] = torch.rot90(tmp,rot[1][1],rot[1][0])
-                        data_e[k][0] = torch.real(torch.fft.ifftn(mwshift*torch.fft.fftn(data_rot[k][0])))#+noise[i][0]#.astype(np.float32)
-                    pred_y = model(data_e)
-                    loss_equivariance = loss_fn(pred_y, data_rot)
-
-                    loss = alpha*loss_equivariance + loss_consistency
+                    #time2 = time.time()
+                    loss = loss_fn(preds, y)
                     loss = loss / acc_batches
+                    #time3 = time.time()
                     loss.backward()
+                    #time4 = time.time()
                 loss_item = loss.item()
-                              
+                
+                
+             
                 if ( (i+1)%acc_batches == 0 ) or (i+1) == min(len(train_loader), steps_per_epoch_train * acc_batches):
                     if mixed_precision:
                         scaler.step(optimizer)
                         scaler.update()
                     else:
                         optimizer.step()
+                time4 = time.time()
 
                 if rank == 0 and ( (i+1)%acc_batches == 0 ):
                    progress_bar.set_postfix({"Loss": loss_item*acc_batches})#, "t1": time2-time1, "t2": time3-time2, "t3": time4-time3})
@@ -146,19 +137,52 @@ def ddp_train(rank, world_size, port_number, model,alpha, data_path, batch_size,
                 if i + 1 >= steps_per_epoch_train*acc_batches:
                     break
             average_loss = average_loss / (i+1.)
-                                      
+                        
+            model.eval()
+
+            # have to convert to tensor because reduce needed it
+            avg_val_loss = torch.tensor(0, dtype=torch.float).to(rank)
+
+            with torch.no_grad():
+                for i, batch in enumerate(val_loader):
+                    x, y = batch
+                    x = x.cuda()#to(rank, non_blocking=True)
+                    y = y.cuda()#to(rank, non_blocking=True)
+                    if mixed_precision:
+                        with torch.cuda.amp.autocast():
+                            preds = model(x)
+                            val_loss = loss_fn(preds, y).item()
+                    else:
+                        preds = model(x)
+                        val_loss = loss_fn(preds, y).item()
+                    avg_val_loss += val_loss
+                    if rank == 0:
+                        progress_bar.set_postfix({"Val_Loss": val_loss})
+                        progress_bar.update()                    
+                    if i + 1 >= steps_per_epoch_val:
+                        break
+                avg_val_loss = avg_val_loss/(i+1.)
+                
+
         dist.barrier()
+
         dist.reduce(average_loss, dst=0)
+        dist.reduce(avg_val_loss, dst=0)
 
         average_loss =  average_loss / dist.get_world_size()
+        avg_val_loss = avg_val_loss / dist.get_world_size()
+
         if rank == 0:
             average_loss_list.append(average_loss.cpu().numpy())
-            print(f"Epoch [{epoch+1}/{epochs}], Train Loss: {average_loss:.4f}")
-            torch.save({
-                'model_state_dict': model.module.state_dict(),
-                'average_loss': average_loss_list,
-                'epoch' : epoch
-                }, model_path)
+            avg_val_loss_list.append(avg_val_loss.cpu().numpy())
+            print(f"Epoch [{epoch+1}/{epochs}], Train Loss: {average_loss:.4f}, Validataion Loss: {avg_val_loss:.4f}")
+    if rank == 0:
+        print("saving")
+        torch.save({
+            'model_state_dict': model.module.state_dict(),
+            'average_loss': average_loss_list,
+            'avg_val_loss': avg_val_loss_list,
+            }, model_path)
     dist.destroy_process_group()
 
 
@@ -195,9 +219,8 @@ def ddp_predict(rank, world_size, port_number, model, data, tmp_data_path):
     dist.destroy_process_group()
 
 class Net:
-    def __init__(self,filter_base=64,unet_depth=4, add_last=False):
-        torch.backends.cudnn.benchmark = True
-        self.model = Unet(filter_base = filter_base,unet_depth=unet_depth, add_last=add_last)
+    def __init__(self,filter_base=64, add_last=False):
+        self.model = Unet(filter_base = filter_base, add_last=add_last)
         self.world_size = torch.cuda.device_count()
         self.port_number = str(find_unused_port())
         logging.info(f"Port number: {self.port_number}")
@@ -206,7 +229,7 @@ class Net:
 
     def load(self, path):
         checkpoint = torch.load(path)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.model.load_state_dict(checkpoint)
 
     def load_jit(self, path):
         #Using the TorchScript format, you will be able to load the exported model and run inference without defining the model class.
@@ -220,19 +243,19 @@ class Net:
         model_scripted = torch.jit.script(self.model) # Export to TorchScript
         model_scripted.save(path) # Save
 
-    def train(self, data_path, output_dir,alpha=1, batch_size=None, output_base='tmp',
+    def train(self, data_path, output_dir, batch_size=None, 
               epochs = 10, steps_per_epoch=200, acc_batches =2,
-              mixed_precision=False, learning_rate=3e-4, fsc3d = None):
+              mixed_precision=False, learning_rate=3e-4):
         print('learning rate',learning_rate)
 
         self.model.zero_grad()
 
-        model_path = f"{output_dir}/{output_base}.pt"
+        model_path = f"{output_dir}/tmp.pt"
         if os.path.exists(model_path):
             os.remove(model_path)
 
         try: 
-            mp.spawn(ddp_train, args=(self.world_size, self.port_number, self.model,alpha, data_path, batch_size, acc_batches, epochs, steps_per_epoch, learning_rate, mixed_precision, model_path, fsc3d), nprocs=self.world_size)
+            mp.spawn(ddp_train, args=(self.world_size, self.port_number, self.model, data_path, batch_size, acc_batches, epochs, steps_per_epoch, learning_rate, mixed_precision, model_path), nprocs=self.world_size)
         except KeyboardInterrupt:
            logging.info('KeyboardInterrupt: Terminating all processes...')
            dist.destroy_process_group() 
@@ -242,6 +265,8 @@ class Net:
         self.model.load_state_dict(checkpoint['model_state_dict'])
 
         self.metrics['average_loss'].extend(checkpoint['average_loss'])
+        self.metrics['avg_val_loss'].extend(checkpoint['avg_val_loss'])
+
 
     def predict(self, mrc_list, result_dir, iter_count, inverted=True, mw3d=None):    
 
@@ -324,7 +349,7 @@ class Net:
     
     def predict_map(self, data, output_dir, cube_size = 64, crop_size=96):
      
-        reform_ins = reform3D(data,cube_size,crop_size,7)
+        reform_ins = reform3D(data,cube_size,crop_size,5)
         data = reform_ins.pad_and_crop()
         # for i,item in enumerate(data):
         #     with mrcfile.new(f"resd_{i}.mrc", overwrite=True) as mrc:
