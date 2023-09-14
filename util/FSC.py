@@ -124,7 +124,7 @@ def ThreeD_FSC(FSC_map, limit_r=None, angle=20, n_processes=16):
             FSC_values = FSC_map[pixels_T]
             results.append(pool.apply_async(calculate_FSC, (pixels_T, FSC_values, point_tree, r0)))
 
-        for i, result in enumerate(results):
+        for i, result in enumerate(tqdm(results)):
             pixels_T = np.where(index == i + 1)
             out[pixels_T] = result.get()
     return out

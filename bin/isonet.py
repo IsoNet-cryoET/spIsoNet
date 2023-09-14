@@ -389,9 +389,8 @@ class ISONET:
                    output_dir: str="isonet_maps",
                    pretrained_model: str=None,
 
-                   epochs: int=10,
-                   threshold: float=None, 
-                   n_subvolume: int=100, 
+                   epochs: int=20,
+                   n_subvolume: int=1000, 
                    cube_size: int=64,
                    predict_crop_size: int=80,
                    batch_size: int=None, 
@@ -407,19 +406,14 @@ class ISONET:
         :param gpuID: The ID of gpu to be used during the training.
         :param ncpus: Number of cpu.
         :param output_dir: The name of directory to save output maps
-        :param limit_res: The resolution limit for recovery, default is the resolution of the map.
-        :param weight: Weight ratio between the predicted and the origional map, only used after the last iteration. Multiple values seperating with commas will generate multiple half maps.
         :param fsc_file: 3DFSC file if not set, isonet will generate one.
-        :param cone_sampling_angle: Angle for 3D fsc sampling for IsoNet generated 3DFSC. IsoNet default is 10 degrees, the default for official 3DFSC is 20 degrees.
         :param epochs: Number of epochs for each iteration. This value can be increase (maybe to 10) to get (maybe) better result.
-        :param threshold: Threshold to make 3DFSC volume binary. We usually do not use it.  
         :param n_subvolume: Number of subvolumes 
-        :param crop_size: The size of subvolumes, should be larger then the cube_size
+        :param predict_crop_size: The size of subvolumes, should be larger then the cube_size
         :param cube_size: Size of cubes for training, should be divisible by 16, e.g. 32, 64, 80.
-        :param mixed_precision: This option will greatly speed up the training and reduce VRAM consumption, often doubling the speed for GPU with tensor cores. If you find that this option does not improve speed, there might be a mismatch for cuda/cudnn/pytorch versions.
         :param batch_size: Size of the minibatch. If None, batch_size will be the max(2 * number_of_gpu,4). batch_size should be divisible by the number of gpu.
         :param acc_batches: If this value is set to 2 (or more), accumulate gradiant will be used to save memory consumption.  
-        :param learning_rate: learning rate. Default learning rate is xx while previous IsoNet tomography used 3e-4 as learning rate
+        :param learning_rate: learning rate. Default learning rate is 3e-4 while previous IsoNet tomography used 3e-4 as learning rate
         """
         #TODO
         #mixed precision does not work for torch.FFT
@@ -475,7 +469,7 @@ class ISONET:
         with mrcfile.open(aniso_file, 'r') as mrc:
             fsc3d = mrc.data
 
-        map_refine(half_map, mask_vol, fsc3d, threshold=threshold,alpha = alpha,  voxel_size=voxel_size, output_dir=output_dir, 
+        map_refine(half_map, mask_vol, fsc3d, alpha = alpha,  voxel_size=voxel_size, output_dir=output_dir, 
                    output_base=output_base, mixed_precision=mixed_precision, epochs = epochs,
                    n_subvolume=n_subvolume, cube_size=cube_size, pretrained_model=pretrained_model,
                    batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size,gpuID=gpuID, learning_rate=learning_rate)

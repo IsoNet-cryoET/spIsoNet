@@ -124,7 +124,6 @@ def ddp_train(rank, world_size, port_number, model,alpha, data_path, batch_size,
                         data_e[k][0] = torch.real(torch.fft.ifftn(mwshift*torch.fft.fftn(data_rot[k][0])))#+noise[i][0]#.astype(np.float32)
                     pred_y = model(data_e)
                     loss_equivariance = loss_fn(pred_y, data_rot)
-
                     loss = alpha*loss_equivariance + loss_consistency
                     loss = loss / acc_batches
                     loss.backward()
@@ -138,7 +137,7 @@ def ddp_train(rank, world_size, port_number, model,alpha, data_path, batch_size,
                         optimizer.step()
 
                 if rank == 0 and ( (i+1)%acc_batches == 0 ):
-                   progress_bar.set_postfix({"Loss": loss_item*acc_batches})#, "t1": time2-time1, "t2": time3-time2, "t3": time4-time3})
+                   progress_bar.set_postfix({"Loss": loss_item})#, "t1": time2-time1, "t2": time3-time2, "t3": time4-time3})
                    progress_bar.update()
                 average_loss += loss_item
 

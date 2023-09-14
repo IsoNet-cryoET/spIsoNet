@@ -28,7 +28,7 @@ def fsc_filter(map,fsc3d):
     outData = np.real(inv).astype(np.float32)
     return outData
 
-def rescale_fsc(fsc3d, threshold, crop_size):
+def rescale_fsc(fsc3d, crop_size):
     half_size = crop_size//2
     fsc3d = skimage.transform.resize(fsc3d, [crop_size,crop_size,crop_size])
     fsc3d[fsc3d<0] = 0
@@ -37,9 +37,9 @@ def rescale_fsc(fsc3d, threshold, crop_size):
     [Z,Y,X] = np.meshgrid(r,r,r)
     index = np.round(np.sqrt(Z**2+Y**2+X**2))
 
-    if threshold is not None:
-        fsc3d[fsc3d<threshold] = 0
-        fsc3d[fsc3d>threshold] = 1
+    #if threshold is not None:
+    #    fsc3d[fsc3d<threshold] = 0
+    #    fsc3d[fsc3d>threshold] = 1
 
     # smooth_limit = True
     # if smooth_limit:
@@ -201,15 +201,15 @@ def extract_subvolume(current_map, n_subvolume, crop_size, mask, output_dir, pre
 
 
 
-def map_refine(halfmap, mask, fsc3d, threshold, alpha, voxel_size, epochs = 10, mixed_precision = False,
+def map_refine(halfmap, mask, fsc3d, alpha, voxel_size, epochs = 10, mixed_precision = False,
                output_dir = "results", output_base="half1", n_subvolume = 50, pretrained_model=None,
                cube_size = 64, predict_crop_size=96, batch_size = 8, acc_batches=2, gpuID="0", learning_rate= 4e-4):
 
-    data_dir = output_dir+"/data"
+    data_dir = output_dir+"/"+output_base+"_data"
     mkfolder(data_dir)
     # from IsoNet.util.FSC import get_rayFSC
     #fsc3d_cube = rescale_fsc(fsc3d, threshold, crop_size)
-    fsc3d_cube_small = rescale_fsc(fsc3d, threshold, cube_size)
+    fsc3d_cube_small = rescale_fsc(fsc3d, cube_size)
     with mrcfile.new('fsc3d_cube_small_pre.mrc', overwrite=True) as mrc:
         mrc.set_data(fsc3d_cube_small)
     # from IsoNet.preprocessing.img_processing import normalize
@@ -245,7 +245,7 @@ def map_refine(halfmap, mask, fsc3d, threshold, alpha, voxel_size, epochs = 10, 
     #if iter_count > 1:
     #    network.load("{}/model_{}_iter{}.h5".format(output_dir, output_base, iter_count-1))
     from IsoNet.models.network import Net
-    network = Net(filter_base = 64,unet_depth=4, add_last=True)
+    network = Net(filter_base = 64,unet_depth=3, add_last=True)
     if pretrained_model is not None:
         network.load(pretrained_model)
     if epochs > 0:
@@ -267,7 +267,7 @@ def map_refine(halfmap, mask, fsc3d, threshold, alpha, voxel_size, epochs = 10, 
 
     files = os.listdir(output_dir)
     for item in files:
-        if item == "data" or item == "data~":
+        if item == output_base+"_data" or item == output_base+"_data~":
             path = f'{output_dir}/{item}'
             shutil.rmtree(path)
         if item.startswith('subvolume'):

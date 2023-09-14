@@ -2,10 +2,9 @@
 
 Single Particle IsoNet (spIsoNet) is designed to correct the preffered orientation effect by self-supervised learning. It iteratively reconstruct missing information in in the missing regions in fourier space. The software requires half maps as input.
 
-## Table of contents
 
 
-## 1. Installation
+# 1. Installation
 
 We suggest using anaconda environment to manage the IsoNet package.
 
@@ -26,99 +25,120 @@ The environment we verified are:
 2. cuda11.3 cudnn8.2 pytorch1.13.1, pytorch installed with conda.
 
 
-## 2. Quick run
+# 2. Quick run
 
-The default parameter in IsoNet should be suitable for most cases, you can also train with a larger epochs or more iterations to get better result. 
-### 2.0 prepare data set
-The tutorial data can be downloaded on google drive
-The data contains a two half maps:xxx  and a solvent mask xxx.
+The default parameter in IsoNet should be suitable for most cases, you can also train with a larger epochs to get better result. 
+
+## 2.0 prepare data set
+The tutorial data can be downloaded on google drive: xxx
+The tutorial data set contains a two half maps: emd_8731_half_map_1.mrc and emd_8731_half_map_2.mrc and a solvent mask emd_8731_msk_1.mrc. After you download the files put those into a new folder.
 
 
-### 2.1. make 3D FSC
+
+## 2.1. make 3D FSC
 
 The algorithum for 3D FSC is based on
 Tan, Y.Z., Baldwin, P.R., Davis, J.H., Williamson, J.R., Potter, C.S., Carragher, B. and Lyumkis, D., 2017. Addressing preferred specimen orientation in single-particle cryo-EM through tilting. Nature methods, 14(8), p.793.
 
-This 3D FSC reimplementation in single particle IsoNet should be faster than the origional version. The 3DFSC volume should be renerated in few seconsds.
+This 3D FSC reimplementation in single particle IsoNet should be faster than the origional version. The 3DFSC volume should be renerated in few minutes. This step does not use GPU accelations. You can use multiple cpu cores for parallelation by specifying "--ncpus".
 
 The input of 3D FSC calculation are two half maps and a solvent mask
 ``` {.bash language="bash"}
-isonet.py fsc3d half1.mrc half2.mrc mask.mrc
+isonet.py fsc3d emd_8731_half_map_1.mrc emd_8731_half_map_2.mrc emd_8731_msk_1.mrc --ncpus 16 
 ```
 
-### 2.1. correction of the 
-You can use
-``` {.bash language="bash"}
-isonet.py map_refine --help
+This will generate a 3DFSC volume called "FSC3D.mrc", which describes the Fouriear shell correlation in different directions. 
+
 ```
+11:07:17, INFO     [isonet.py:552] Global resolution at FSC=0.143 is 4.191999816894532
+11:07:17, INFO     [isonet.py:555] Limit resolution to 4.191999816894532 for IsoNet 3D calculation. You can also tune this paramerter with --limit_res .
+11:07:17, INFO     [isonet.py:557] calculating fast 3DFSC, this will take few minutes
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 80/80 [00:02<00:00, 28.95it/s]
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 80/80 [00:03<00:00, 24.20it/s]
+11:07:23, INFO     [isonet.py:562] voxel_size 1.309999942779541
+```
+
+## 2.2. Single particle IsoNet correction of the half map1
+
+This step used train a network for anositropic correction for first half map with "isonet.py map_refine". The input of this command is the first halfmap and the solvent mask.
+
+This step will create a folder to store the output files of IsoNet. The corrected map is stored as "correctedXXX.mrc" in that folder. You can also find trained neural network "XX.pt" and figure for loss change "loss.png" in the folder.  
 
 The command to using single particle IsoNet should be
 ``` {.bash language="bash"}
-isonet.py map_refine halfmap1 halfmap2 maskfile --gpuID 0,1,2,3
+isonet.py map_refine emd_8731_half_map_1.mrc FSC3D.mrc --mask emd_8731_msk_1.mrc --epochs 20 --alpha 1 --output_dir isonet_maps --gpuID 0,1,2,3
 ```
 
 Here is expected command line output
 ``` {.bash language="bash"}
-14:32:01, WARNING  [utils.py:7] The isonet_maps folder already exists
- The old isonet_maps folder will be renamed (to isonet_maps~)
-14:32:06, INFO     [isonet.py:478] Global resolution at FSC=0.143 is 4.191999816894532
-14:32:06, INFO     [isonet.py:482] Limit resolution to 4.191999816894532 for IsoNet missing information recovery. You can also tune this paramerter with --limit_res .
-14:32:06, INFO     [isonet.py:488] calculating fast 3DFSC, this will take few minutes
-14:32:13, INFO     [isonet.py:495] voxel_size 1.309999942779541
-14:32:13, INFO     [isonet.py:502] noise_scale: 0.6566901692575242
-14:32:13, INFO     [isonet.py:506] processing half map1
-14:32:16, INFO     [network.py:228] Port number: 37747
-14:32:16, INFO     [map_refine.py:233] Start Iteration1!
-14:32:16, INFO     [map_refine.py:235] Start preparing subvolumes!
-14:33:48, INFO     [map_refine.py:238] Done preparing subvolumes!
-14:33:48, INFO     [map_refine.py:240] Start training!
-learning rate 0.0004
-True
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
-Epoch [1/5], Train Loss: 0.2940, Validataion Loss: 0.2801
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
-Epoch [2/5], Train Loss: 0.2719, Validataion Loss: 0.2724
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
-Epoch [3/5], Train Loss: 0.2669, Validataion Loss: 0.2683
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
-Epoch [4/5], Train Loss: 0.2636, Validataion Loss: 0.2666
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
-Epoch [5/5], Train Loss: 0.2612, Validataion Loss: 0.2649
+11:13:15, INFO     [utils.py:15] The isonet_maps folder already exists, outputs will write into this folder
+11:13:15, INFO     [isonet.py:466] voxel_size 1.309999942779541
+11:13:15, WARNING  [utils.py:8] The isonet_maps/data folder already exists. The old isonet_maps/data folder will be moved to isonet_maps/data~
+11:13:24, INFO     [map_refine.py:239] Start preparing subvolumes!
+11:13:24, INFO     [map_refine.py:242] Done preparing subvolumes!
+11:13:24, INFO     [map_refine.py:244] Start training!
+11:13:25, INFO     [network.py:202] Port number: 43963
+learning rate 0.0003
+(8, 9)
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 250/250 [02:13<00:00,  1.87batch/s, Loss=0.598]
+Epoch [1/20], Train Loss: 0.6581
+ 14%|█████████████████████████████████▌                                                                                                                                                                                                       | 36/250 [00:16<01:40,  2.14batch/s, Loss=0.533]
+...
 
 ```
 
-## 2. individual parameters
+You can check the command line argument for the map_refine with the following command:
+``` {.bash language="bash"}
+isonet.py map_refine --help
+```
 
-###TODO
+## 2.3. Single particle IsoNet correction of the half map2
 
-        """
-        \ntrain neural network to correct preffered orientation\n
-        isonet.py map_refine half1.mrc half2.mrc mask.mrc [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
-        :param i: Input name of half1
-        :param i2: Input name of half2
-        :param mask_file: Filename of a user-provided mask
-        :param gpuID: The ID of gpu to be used during the training.
-        :param ncpus: Number of cpu.
-        :param output_dir: The name of directory to save output maps
-        :param limit_res: The resolution limit for recovery, default is the resolution of the map.
-        :param fsc_file: 3DFSC file if not set, isonet will generate one.
-        :param cone_sampling_angle: Angle for 3D fsc sampling for IsoNet generated 3DFSC. IsoNet default is 10 degrees, the default for official 3DFSC is 20 degrees.
-        :param iterations: Number of iterations.
-        :param epochs: Number of epochs for each iteration. This value can be increase (maybe to 10) to get (maybe) better result.
-        :param threshold: Threshold to make 3DFSC volume binary. We usually do not use it.  
-        :param n_subvolume: Number of subvolumes 
-        :param crop_size: The size of subvolumes, should be larger then the cube_size
-        :param cube_size: Size of cubes for training, should be divisible by 16, eg. 32, 64.
-        :param mixed_precision: This option will greatly speed up the training and reduce VRAM consumption, often doubling the speed for GPU with tensor cores. If you find that this option does not improve speed, there might be a mismatch for cuda/cudnn/pytorch versions.
-        :param batch_size: Size of the minibatch. If None, batch_size will be the max(2 * number_of_gpu,4). batch_size should be divisible by the number of gpu.
-        :param acc_batches: If this value is set to 2 (or more), accumulate gradiant will be used to save memory consumption.  
-        :param learning_rate: learning rate. Default learning rate is xx while previous IsoNet tomography used 3e-4 as learning rate
-        """
+This step is performed similar with the previous step, but instead of providing the half1, you would provide half2 as command line argument.
 
-## 3 example dataset
+The example command of this step 
+``` {.bash language="bash"}
+isonet.py map_refine emd_8731_half_map_2.mrc FSC3D.mrc --mask emd_8731_msk_1.mrc --epochs 20 --alpha 1 --output_dir isonet_maps --gpuID 0,1,2,3
+```
 
-## 4 run single particle IsoNet step by step
-This session is not necessary but it might be good for diasgniostic purpose or you want to continue from previous runs.
+## 2.4. Postprocessing
 
-### 4.1 generate 3D FSC volume 
-This step generate the 3DFSC volume from two maps.
+Postprocessing of the corrected halfmaps is not implimented in single particle IsoNet. Please use your favourate software package for sharpening with the corrected half maps.
+
+
+# 3. advanced topics
+
+## 3.1 Put all steps together.
+
+You can prepare a sh file containing three commands and run them in a single step: 
+such as 
+```
+isonet.py fsc3d emd_8731_half_map_1.mrc emd_8731_half_map_2.mrc emd_8731_msk_1.mrc --ncpus 16
+isonet.py map_refine emd_8731_half_map_1.mrc FSC3D.mrc --mask emd_8731_msk_1.mrc --gpuID 0,1,2,3
+isonet.py map_refine emd_8731_half_map_1.mrc FSC3D.mrc --mask emd_8731_msk_1.mrc --gpuID 0,1,2,3
+```
+
+## 3.2 GPU memory consumption
+Here is the table of GPU memory consumption. Based on previous IsoNet experience, larger batch size (> 4) works better. And acc_batches larger than 1 uses accumulate gradient to reduce memory consumption and batch_size should be divisible by acc_batches.
+| Number of GPUs    | batch_size | acc_batches | memory useage per GPU |
+| -------- | ------- | ------- | ------- |
+| 1        | 4*      | 1*      | ~17.0GB |
+| 1        | 4*      | 2       | ~10.7GB |
+| 1        | 4*      | 4       | ~7.0GB  |
+| 2        | 4*      | 1*      | ~10GB   |
+| 4        | 8*      | 1*      | ~10GB   |
+* means default values
+
+## 3.3 continue from previous trained model
+The single particle IsoNet will generate a neuronal network model named xx.pt in the output folder, you can start from that model with the parameter "--pretrained_model".
+
+Once you start with the pretained model, you may also want to change the number of epoches to run. For example, the trained model is from the 10th epochs and you can train for another 10 epoch to make it equivalent to the 20 iteractions from scratch.
+
+
+## 3.4 Alpha weighting
+
+The most importent parameter that affect your result in single particle IsoNet is alpha. This alpha defines the weighting between the data consistency loss and the rotational equivarient loss. The default value one meaning putting equal weight on the two losses. The larger value means more weight on the rotational equivarient loss.
+
+Empirically, the larger alpha value will results in smoother results. Please see the following images of corrected_half1.mrc with different alpha values.
+
+<p align="center"> <img src="figures/alpha.png" width="800"> </p>
