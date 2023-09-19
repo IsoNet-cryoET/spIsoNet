@@ -113,9 +113,8 @@ def simulate_noise(params):
     iradon_image = np.rot90(np.array(list(res), dtype=np.float32)[:,start:start+params[0],start:start+params[0]], k = 1 , axes = (0,1))
     return iradon_image
 
-def make_noise_folder(noise_folder,noise_filter,cube_size,num_noise=1000,ncpus=1,large_side=1000):
+def make_noise_folder(noise_folder,noise_filter,cube_size,num_noise=1000,ncpus=1,large_side=500):
     mkfolder(noise_folder)
-    print('generating large noise volume; mode: {}'.format(noise_filter))
     NoiseMap.refresh(large_side, noise_filter, ncpus)
                         
     for i in range(num_noise):

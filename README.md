@@ -1,21 +1,32 @@
-# Isotropic Reconstruction of Electron Tomograms with Deep Learning
-# IsoNet version 0.2
 [![DOI](https://zenodo.org/badge/222662248.svg)](https://zenodo.org/badge/latestdoi/222662248)
 ##
-Update on July8 2022
+# Isotropic Reconstruction of Electron Tomograms with Deep Learning
+# IsoNet version 1.0
 
+Update on June27 2023
+
+## Google group
 We maintain an IsoNet Google group for discussions or news.
 
 To subscribe or visit the group via the web interface please visit https://groups.google.com/u/1/g/isonet. 
 
 If you do not have and are not willing to create a Google login, you can also request membership by sending an email to yuntao@g.ucla.edu
 
-After your request is approved, you will be added to the group and will receive a confirmation email. Once subscribed, we request that you edit your membership settings so that your display name is your real name. 
-
 To post to the forum you can either use the web interface or email to isonet@googlegroups.com
+
+## Major changes from provious version of IsoNet
+1. IsoNet 1.0 incoorporated single particle IsoNet (spIsoNet) package, which enables correct artifacts caused by preffered orientaion.
+
+To run IsoNet for single particle analysis. Please run command like 
+```
+isonet.py map_refine half1.mrc half2.mrc mask.mrc
+```
+
+2. The network become larger and can not be modified 
 
 
 ## Installation
+
 python version at least 3.5 is required. If you download the package as a zip file from github, please rename the folder IsoNet-master to IsoNet.
 
 1.  IsoNet relies on Tensorflow with version at least 2.0

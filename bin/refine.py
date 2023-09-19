@@ -1,5 +1,4 @@
 import logging
-from re import I
 from IsoNet.preprocessing.prepare import get_cubes_list,get_noise_level, prepare_first_iter
 from IsoNet.util.dict2attr import save_args_json,load_args_from_json
 import numpy as np
@@ -8,6 +7,8 @@ import sys
 import shutil
 from IsoNet.util.metadata import MetaData
 from IsoNet.util.utils import mkfolder
+from IsoNet.util.plot_metrics import plot_metrics
+
 
 def run(args):
     if args.log_level == "debug":
@@ -30,23 +31,14 @@ def run(args):
                     args.__dict__[item] = args_continue.__dict__[item]
         args = run_whole(args)
 
-        #environment
         os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
         os.environ["CUDA_VISIBLE_DEVICES"]=args.gpuID
-        os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
-        if args.log_level == 'debug':
-            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'
-        else:
-            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-        
-            #check_gpu(args)
-            #from IsoNet.models.unet.predict import predict
-            #from IsoNet.models.unet.train import prepare_first_model, train_data
+
         from IsoNet.models.network import Net
-        if not hasattr(args, "metrics"):
-            network = Net()
-        else:
-            network = Net(args.metrics)
+        #if not hasattr(args, "metrics"):
+        network = Net(filter_base = 64)
+        #else:
+        #    network = Net(filter_base = 64, metrics = args.metrics)
 
         ###  find current iterations ###        
         current_iter = args.iter_count if hasattr(args, "iter_count") else 1
@@ -109,17 +101,17 @@ def run(args):
             num_noise_volume = 1000
             if num_iter>=args.noise_start_iter[0] and (not os.path.isdir(args.noise_dir) or len(os.listdir(args.noise_dir))< num_noise_volume ):
                 from IsoNet.util.noise_generator import make_noise_folder
-                logging.info(args.noise_mode)
-                make_noise_folder(args.noise_dir,args.noise_mode,args.cube_size,num_noise_volume,ncpus=args.preprocessing_ncpus)
+                logging.info('generating large noise volume; mode: {}'.format(args.noise_mode))
+                make_noise_folder(args.noise_dir,args.noise_mode,args.cube_size,num_noise_volume,ncpus=args.ncpus)
             noise_level_series = get_noise_level(args.noise_level,args.noise_start_iter,args.iterations)
             args.noise_level_current =  noise_level_series[num_iter]
             logging.info("Noise Level:{}".format(args.noise_level_current))
 
             ### remove data_dir and generate training data in data_dir###
             try:
-                shutil.rmtree(args.data_dir)     
+               shutil.rmtree(args.data_dir)     
             except OSError:
-                pass
+               pass
             get_cubes_list(args)
             logging.info("Done preparing subtomograms!")
 
@@ -134,18 +126,18 @@ def run(args):
             ### start training and save model and json ###
             logging.info("Start training!")
             # try:
-            metrics = network.train(args.data_dir,gpuID=args.gpuID, 
+
+            network.train(args.data_dir, args.result_dir,
                             learning_rate=args.learning_rate, batch_size=args.batch_size,
-                            epochs = args.epochs,steps_per_epoch=args.steps_per_epoch,acc_grad=args.low_mem) #train based on init model and save new one as model_iter{num_iter}.h5
+                            epochs = args.epochs,steps_per_epoch=args.steps_per_epoch,acc_batches=args.acc_batches, mixed_precision=args.mixed_precision) #train based on init model and save new one as model_iter{num_iter}.h5
             # except KeyboardInterrupt as exception: 
             #     sys.exit("Keyboard interrupt")
-            args.metrics = metrics
+            
  
             network.save('{}/model_iter{:0>2d}.h5'.format(args.result_dir, args.iter_count))
-
             save_args_json(args,args.result_dir+'/refine_iter{:0>2d}.json'.format(num_iter))
-            from IsoNet.util.plot_metrics import plot_metrics
-            plot_metrics(metrics, args.result_dir+"/losses.png")
+            
+            plot_metrics(network.metrics, f"{args.result_dir}/loss.png")
             logging.info("Done training!")
 
             ### for last iteration predict subtomograms ###
@@ -181,31 +173,34 @@ def run_whole(args):
     #*******calculate parameters********
     if args.gpuID is None:
         args.gpuID = '0,1,2,3'
-    else:
-        args.gpuID = str(args.gpuID)
+
+    from IsoNet.util.utils import process_gpuID
+    ngpus, args.gpuID, gpuID_list = process_gpuID(args.gpuID)
+
+    os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+    os.environ["CUDA_VISIBLE_DEVICES"]=args.gpuID
+
     if args.data_dir is None:
         args.data_dir = args.result_dir + '/data'
     if args.iterations is None:
         args.iterations = 30
-    args.ngpus = len(list(set(args.gpuID.split(','))))
+
     if args.result_dir is None:
         args.result_dir = 'results'
     if args.batch_size is None:
-        args.batch_size = max(4, 2 * args.ngpus)
+        args.batch_size = max(4, 2 * ngpus)
+    logging.info(f"batch_size: {args.batch_size}")
+    logging.info("note we tested that larger batche_size (e.g. 8) yield slightly better result than small batch_size such as 4")
     args.predict_batch_size = args.batch_size
-    # if args.filter_base is None:
-    #     args.filter_base = 64
-    #     # if md._data[0].rlnPixelSize >15:
-    #     #     args.filter_base = 32
-    #     # else:
-    #     #     args.filter_base = 64
+
+
     if args.steps_per_epoch is None:
         if args.select_subtomo_number is None:
             args.steps_per_epoch = min(int(len(md) * 8/args.batch_size) , 200)
         else:
             args.steps_per_epoch = min(int(int(args.select_subtomo_number) * 6/args.batch_size) , 200)
     if args.learning_rate is None:
-        args.learning_rate = 0.0004
+        args.learning_rate = 0.0003
     #if args.noise_level is None:
     #    args.noise_level = (0.05,0.10,0.15,0.20)
     #if args.noise_start_iter is None:
@@ -224,6 +219,14 @@ def run_whole(args):
     for i,it in enumerate(md):
         if "rlnImageName" in md.getLabels():
             args.all_mrc_list.append(it.rlnImageName)
+
+    args.prefill = False
+
+    if args.batch_size % (args.acc_batches * ngpus) != 0:
+        logging.error("Please make sure batches size is equal to or divisible by (acc_batches * number_of_GPU).")
+        logging.error(f"batch_size: {args.batch_size}, num_gpus :{ngpus}, acc_batches: {args.acc_batches}")
+        sys.exit(0)
+
     return args
 
 

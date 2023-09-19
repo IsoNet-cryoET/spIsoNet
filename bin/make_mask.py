@@ -22,6 +22,32 @@ def make_mask_dir(tomo_dir,mask_dir,side = 8, density_percentage=30,std_percenta
         print('tomo and mask',tomo, mask_list[i])
         make_mask(tomo, mask_list[i],side = side,density_percentage=density_percentage,std_percentage=std_percentage,surface=surface)
 
+def make_mask_sp(tomo_path, mask_name, sd = 2, offset = 3):
+    from scipy.ndimage.filters import gaussian_filter, convolve
+    from skimage.filters import threshold_otsu
+    with mrcfile.open(tomo_path) as n:
+        header_input = n.header
+        pixel_size = n.voxel_size
+        tomo = n.data.astype(np.float32)
+    gauss = gaussian_filter(tomo, float(sd), mode='constant')
+    sp=np.array(tomo.shape)
+    out_mask = gauss
+    out_mask = (out_mask-np.min(out_mask))/(np.max(out_mask)-np.min(out_mask))
+    thresh = threshold_otsu(gauss)
+    out_mask = gauss > thresh
+    
+    shape = (offset, offset, offset)
+    k = np.ones(shape, dtype=int)
+    out_mask = convolve(out_mask, k, mode='constant')
+    out_mask = out_mask > 0
+    out_mask = out_mask.astype(np.uint8)
+    
+    with mrcfile.new(mask_name,overwrite=True) as n:
+        n.set_data(out_mask)
+        n.header.extra2 = header_input.extra2
+        n.header.origin = header_input.origin
+        n.header.nversion = header_input.nversion
+        n.voxel_size = pixel_size
 
 def make_mask(tomo_path, mask_name, mask_boundary = None, side = 5, density_percentage=50., std_percentage=50., surface=None):
     from scipy.ndimage.filters import gaussian_filter
@@ -31,7 +57,7 @@ def make_mask(tomo_path, mask_name, mask_boundary = None, side = 5, density_perc
         header_input = n.header
         #print(header_input)
         pixel_size = n.voxel_size
-        tomo = -1*n.data.astype(np.float32)
+        tomo = n.data.astype(np.float32)
     sp=np.array(tomo.shape)
     sp2 = sp//2
     bintomo = resize(tomo,sp2,anti_aliasing=True)
