@@ -389,7 +389,7 @@ class ISONET:
                    output_dir: str="isonet_maps",
                    pretrained_model: str=None,
 
-                   epochs: int=20,
+                   epochs: int=50,
                    n_subvolume: int=1000, 
                    cube_size: int=64,
                    predict_crop_size: int=80,
