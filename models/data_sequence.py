@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from torch.utils.data.dataset import Dataset
 import mrcfile
-from IsoNet.preprocessing.img_processing import normalize
+from spIsoNet.preprocessing.img_processing import normalize
 
 class Train_sets_sp(Dataset):
     def __init__(self, data_dir, max_length = None, shuffle=True, prefix = "train"):

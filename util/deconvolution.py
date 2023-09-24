@@ -181,7 +181,7 @@ def deconv_one(tomo, out_tomo,defocus=1.0, pixel_size=1.0,snrfalloff=1.0, deconv
     import mrcfile
     from multiprocessing import Pool
     from functools import partial
-    from IsoNet.util.deconvolution import tom_deconv_tomo,Chunks
+    from spIsoNet.util.deconvolution import tom_deconv_tomo,Chunks
     import shutil
     import time
     t1 = time.time()

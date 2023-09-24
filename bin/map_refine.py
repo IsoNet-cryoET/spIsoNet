@@ -1,17 +1,17 @@
 import logging
 import numpy as np
-from IsoNet.preprocessing.cubes import create_cube_seeds,crop_cubes
-from IsoNet.util.rotations import rotation_list
+from spIsoNet.preprocessing.cubes import create_cube_seeds,crop_cubes
+from spIsoNet.util.rotations import rotation_list
 import mrcfile
 import scipy
 from multiprocessing import Pool
 from functools import partial
-from IsoNet.util.utils import mkfolder
+from spIsoNet.util.utils import mkfolder
 import skimage
-from IsoNet.preprocessing.img_processing import normalize
+from spIsoNet.preprocessing.img_processing import normalize
 import os
 import sys
-from IsoNet.util.plot_metrics import plot_metrics
+from spIsoNet.util.plot_metrics import plot_metrics
 import shutil
        
 def crop_to_size(array, crop_size, cube_size):
@@ -207,12 +207,12 @@ def map_refine(halfmap, mask, fsc3d, alpha, voxel_size, epochs = 10, mixed_preci
 
     data_dir = output_dir+"/"+output_base+"_data"
     mkfolder(data_dir)
-    # from IsoNet.util.FSC import get_rayFSC
+    # from spIsoNet.util.FSC import get_rayFSC
     #fsc3d_cube = rescale_fsc(fsc3d, threshold, crop_size)
     fsc3d_cube_small = rescale_fsc(fsc3d, cube_size)
     with mrcfile.new('fsc3d_cube_small_pre.mrc', overwrite=True) as mrc:
         mrc.set_data(fsc3d_cube_small)
-    # from IsoNet.preprocessing.img_processing import normalize
+    # from spIsoNet.preprocessing.img_processing import normalize
     # fsc3d_cube_small = normalize(fsc3d_cube_small,percentile = True, pmin=10, pmax=90, clip=True)
     # with mrcfile.new('fsc3d_cube_small.mrc', overwrite=True) as mrc:
     #     mrc.set_data(fsc3d_cube_small)
@@ -244,7 +244,7 @@ def map_refine(halfmap, mask, fsc3d, alpha, voxel_size, epochs = 10, mixed_preci
     logging.info("Start training!")
     #if iter_count > 1:
     #    network.load("{}/model_{}_iter{}.h5".format(output_dir, output_base, iter_count-1))
-    from IsoNet.models.network import Net
+    from spIsoNet.models.network import Net
     network = Net(filter_base = 64,unet_depth=3, add_last=True)
     if pretrained_model is not None:
         network.load(pretrained_model)
@@ -423,7 +423,7 @@ def map_refine(halfmap, mask, fsc3d, alpha, voxel_size, epochs = 10, mixed_preci
 #     mkfolder(data_dir)
 #     fsc3d, fsc3d_cube, fsc3d_full = process_3dfsc(halfmap[0],fsc3d,weighting,crop_size,cube_size,voxel_size,limit_res)
 
-#     from IsoNet.models.network import Net
+#     from spIsoNet.models.network import Net
 #     network = Net(fsc3d=fsc3d_cube)
 #     current_map = []
 #     #main iterations

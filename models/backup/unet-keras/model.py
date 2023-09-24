@@ -1,4 +1,4 @@
-from IsoNet.models.unet import builder,builder_fullconv,builder_fullconv_old,build_old_net
+from spIsoNet.models.unet import builder,builder_fullconv,builder_fullconv_old,build_old_net
 from tensorflow.keras.layers import Input,Add,Activation
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam

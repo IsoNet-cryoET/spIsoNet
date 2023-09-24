@@ -27,7 +27,7 @@ class Brats(Dataset):
     def __len__(self):
         return len(self.path_all[0])
 
-from IsoNet.preprocessing.img_processing import normalize
+from spIsoNet.preprocessing.img_processing import normalize
 class Predict_sets(Dataset):
     def __init__(self, mrc_list):
         super(Predict_sets, self).__init__()

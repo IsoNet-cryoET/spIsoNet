@@ -1,4 +1,4 @@
-from IsoNet.models.unet.model import Unet, Context_encoder
+from spIsoNet.models.unet.model import Unet, Context_encoder
 import torch
 import os
 import pytorch_lightning as pl  

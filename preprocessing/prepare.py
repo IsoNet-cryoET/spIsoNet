@@ -3,16 +3,16 @@ import sys
 import logging
 import sys
 import mrcfile
-from IsoNet.preprocessing.cubes import create_cube_seeds,crop_cubes,DataCubes
-from IsoNet.preprocessing.img_processing import normalize
-from IsoNet.preprocessing.simulate import apply_wedge, mw2D
-from IsoNet.preprocessing.simulate import apply_wedge_dcube
+from spIsoNet.preprocessing.cubes import create_cube_seeds,crop_cubes,DataCubes
+from spIsoNet.preprocessing.img_processing import normalize
+from spIsoNet.preprocessing.simulate import apply_wedge, mw2D
+from spIsoNet.preprocessing.simulate import apply_wedge_dcube
 from multiprocessing import Pool
 import numpy as np
 from functools import partial
-from IsoNet.util.rotations import rotation_list
+from spIsoNet.util.rotations import rotation_list
 # from difflib import get_close_matches
-from IsoNet.util.metadata import MetaData, Item, Label
+from spIsoNet.util.metadata import MetaData, Item, Label
 #Make a new folder. If exist, nenew it
 # Do not set basic config for logging here
 # logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',datefmt="%H:%M:%S",level=logging.DEBUG)
@@ -93,7 +93,7 @@ def get_cubes_one(data_X, data_Y, settings, start = 0, mask = None, add_noise = 
                 return res
             noise_volume = read_vol(path_noise[path_index])
         else:
-            from IsoNet.util.noise_generator import make_noise_one
+            from spIsoNet.util.noise_generator import make_noise_one
             noise_volume = make_noise_one(cubesize = settings.cube_size,mode=settings.noise_mode)
         
         #Noise along y axis is indenpedent, so that the y axis can be permutated.

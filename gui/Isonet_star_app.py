@@ -11,9 +11,9 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QTableWidgetItem,QMessageBox
 from PyQt5.QtCore import QProcess
 #Isonet packages
-from IsoNet.gui.isonet_gui import Ui_MainWindow ##need to change in the package
-from IsoNet.gui.model_star import Model, setTableWidget #need to change in the package
-from IsoNet.util.metadata import MetaData,Label,Item
+from spIsoNet.gui.isonet_gui import Ui_MainWindow ##need to change in the package
+from spIsoNet.gui.model_star import Model, setTableWidget #need to change in the package
+from spIsoNet.util.metadata import MetaData,Label,Item
 
 class MainWindowUIClass( Ui_MainWindow ):
     def __init__( self ):
@@ -114,8 +114,8 @@ class MainWindowUIClass( Ui_MainWindow ):
         #########################
 
         #get the root path for isonet
-        isonet_path = os.popen("which isonet.py").read()
-        tmp = isonet_path.split("bin/isonet.py")
+        isonet_path = os.popen("which spisonet.py").read()
+        tmp = isonet_path.split("bin/spisonet.py")
         root_path = tmp[0]
 
         icon = QtGui.QIcon()
@@ -504,7 +504,7 @@ class MainWindowUIClass( Ui_MainWindow ):
     def deconvolve( self ):
 
         tomogram_star = self.model.tomogram_star
-        cmd = "isonet.py deconv {} ".format(tomogram_star)
+        cmd = "spisonet.py deconv {} ".format(tomogram_star)
         
         if self.lineEdit_deconv_dir.text():
             cmd = "{} --deconv_folder {}".format(cmd, self.lineEdit_deconv_dir.text())
@@ -531,7 +531,7 @@ class MainWindowUIClass( Ui_MainWindow ):
 
         tomogram_star = self.model.tomogram_star
 
-        cmd = "isonet.py make_mask {} ".format(tomogram_star)
+        cmd = "spisonet.py make_mask {} ".format(tomogram_star)
 
         if self.lineEdit_mask_dir.text():
             cmd = "{} --mask_folder {}".format(cmd, self.lineEdit_mask_dir.text())
@@ -553,7 +553,7 @@ class MainWindowUIClass( Ui_MainWindow ):
     def extract_subtomo( self ):
         tomogram_star = self.model.tomogram_star
 
-        cmd = "isonet.py extract {} ".format(tomogram_star)
+        cmd = "spisonet.py extract {} ".format(tomogram_star)
         
         if self.lineEdit_subtomo_dir.text():
             cmd = "{} --subtomo_folder {}".format(cmd, self.lineEdit_subtomo_dir.text())
@@ -575,7 +575,7 @@ class MainWindowUIClass( Ui_MainWindow ):
     def refine( self ):
         subtomo_star = self.lineEdit_subtomo_star_refine.text() if self.lineEdit_subtomo_star_refine.text() else "subtomo.star"
 
-        cmd = "isonet.py refine {} ".format(subtomo_star)
+        cmd = "spisonet.py refine {} ".format(subtomo_star)
 
         if self.lineEdit_gpuID_refine.text():
             cmd = "{} --gpuID {}".format(cmd, self.lineEdit_gpuID_refine.text())
@@ -641,7 +641,7 @@ class MainWindowUIClass( Ui_MainWindow ):
     def predict( self ):
         tomo_star = self.lineEdit_tomo_star_predict.text() if self.lineEdit_tomo_star_predict.text() else "tomograms.star"
         gpuID = self.lineEdit_gpuID_predict.text() if self.lineEdit_gpuID_predict.text() else '0,1,2,3'
-        cmd = "isonet.py predict {}".format(tomo_star)
+        cmd = "spisonet.py predict {}".format(tomo_star)
         
         if self.lineEdit_pretrain_model_predict.text() and self.model.isValid(self.lineEdit_pretrain_model_predict.text()):
             cmd = "{} {}".format(cmd, self.lineEdit_pretrain_model_predict.text())
@@ -816,7 +816,7 @@ class MainWindowUIClass( Ui_MainWindow ):
         
         self.save_setting_spa()
 
-        cmd = "isonet.py map_refine"
+        cmd = "spisonet.py map_refine"
 
         if self.lineEdit_half_1.text():
             cmd = "{} {}".format(cmd, self.lineEdit_half_1.text())

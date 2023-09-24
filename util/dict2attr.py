@@ -52,7 +52,7 @@ def check_parse(args_list):
             check_list = None
     else:
         check_list = None
-        # logging.error(" '{}' is NOT a IsoNet function!".format(args_list[0]))
+        # logging.error(" '{}' is NOT a spIsoNet function!".format(args_list[0]))
         # sys.exit(0)
     # check_list not None means need to check the parameters.
     if check_list is not None:

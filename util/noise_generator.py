@@ -2,11 +2,11 @@
 import numpy as np
 import random
 from scipy.ndimage import rotate
-from IsoNet.preprocessing.simulate import apply_wedge
+from spIsoNet.preprocessing.simulate import apply_wedge
 import os
 import mrcfile
 from skimage.transform import iradon
-from IsoNet.util.utils import mkfolder
+from spIsoNet.util.utils import mkfolder
 
 def simulate_noise1(params):
     np.random.seed(random.randint(0,100000))

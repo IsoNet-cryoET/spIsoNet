@@ -2482,7 +2482,7 @@ class Ui_MainWindow(object):
 
         self.label_cone_sampling_angle.setText(_translate("MainWindow", "Cone sampling angle"))
         self.lineEdit_cone_sampling_angle.setToolTip(_translate("MainWindow", "<html><head/><body><p><span style=\" font-size:9pt;\">\
-            Angle for 3D fsc sampling for IsoNet generated 3DFSC. IsoNet default is 10 degrees, the default for official 3DFSC is 20 degrees.</span></p><p><span style=\" font-size:9pt;\"><br/></span></p></body></html>"))
+            Angle for 3D fsc sampling for spIsoNet generated 3DFSC. spIsoNet default is 10 degrees, the default for official 3DFSC is 20 degrees.</span></p><p><span style=\" font-size:9pt;\"><br/></span></p></body></html>"))
         self.lineEdit_cone_sampling_angle.setPlaceholderText(_translate("MainWindow", "10"))
 
         self.groupBox_spa_3.setTitle(_translate("MainWindow", "Network"))
@@ -2529,7 +2529,7 @@ class Ui_MainWindow(object):
 
         self.label_learning_rate_spa.setText(_translate("MainWindow", "Learning Rate"))
         self.lineEdit_learning_rate_spa.setToolTip(_translate("MainWindow", "<html><head/><body><p><span style=\" font-size:9pt;\">\
-            learning rate. Default learning rate is xx while previous IsoNet tomography used 3e-4 as learning rate. </span></p><p><span style=\" font-size:9pt;\"><br/></span></p></body></html>"))
+            learning rate. Default learning rate is xx while previous spIsoNet tomography used 3e-4 as learning rate. </span></p><p><span style=\" font-size:9pt;\"><br/></span></p></body></html>"))
         self.lineEdit_learning_rate_spa.setPlaceholderText(_translate("MainWindow", "0.0003"))
 
         self.checkBox_mixed_precision_spa.setText(_translate("MainWindow", "Mixed Precision"))

@@ -2,18 +2,18 @@
 
 from setuptools import setup, find_packages
 
-setup(name='IsoNet',
+setup(name='spIsoNet',
     version=1.0,
-    description='IsoNet isotropic reconstruction',
-    url='https://github.com/IsoNet-cryoET/IsoNet',
+    description='spIsoNet isotropic reconstruction',
+    url='https://github.com/spIsoNet-cryoET/spIsoNet',
     license='MIT',
-    packages=['IsoNet'],
+    packages=['spIsoNet'],
     package_dir={
-        'IsoNet': '.',
+        'spIsoNet': '.',
     },
     entry_points={
         "console_scripts": [
-            "isonet.py = IsoNet.bin.isonet:main",
+            "spisonet.py = spIsoNet.bin.isonet:main",
         ],
     },
     include_package_data = True,

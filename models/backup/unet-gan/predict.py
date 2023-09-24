@@ -3,7 +3,7 @@ import torch
 #tf.get_logger().setLevel(logging.ERROR)
 #from tensorflow.keras.models import load_model
 import mrcfile
-from IsoNet.preprocessing.img_processing import normalize
+from spIsoNet.preprocessing.img_processing import normalize
 import numpy as np
 #import tensorflow.keras.backend as K
 #import tensorflow as tf

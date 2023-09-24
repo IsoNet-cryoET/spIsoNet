@@ -1,6 +1,6 @@
 def generate_command(star_file: str, mask_dir: str=None, ncpu: int=10, gpu_memory: int=10, ngpu: int=4, pixel_size: float=10, also_denoise: bool=True):
         """
-        \nGenerate recommanded parameters for "isonet.py refine" for users\n
+        \nGenerate recommanded parameters for "spisonet.py refine" for users\n
         Only print command, not run it.
         :param input_dir: (None) directory containing tomogram(s) from which subtomos are extracted; format: .mrc or .rec
         :param mask_dir: (None) folder containing mask files, Eash mask file corresponds to one tomogram file, usually basename-mask.mrc
@@ -12,7 +12,7 @@ def generate_command(star_file: str, mask_dir: str=None, ncpu: int=10, gpu_memor
         """
         import mrcfile
         import numpy as np
-        s="isonet.py refine --input_dir {} ".format(tomo_dir)
+        s="spisonet.py refine --input_dir {} ".format(tomo_dir)
         
 
         s+="--preprocessing_ncpus {} ".format(ncpu)
@@ -48,7 +48,7 @@ def generate_command(star_file: str, mask_dir: str=None, ncpu: int=10, gpu_memor
         s+="--cube_size {} --crop_size {} ".format(cube_size, int(cube_size*1.5))
 
         # num_per_tomo = int(vsize/(cube_size**3) * 0.5)
-        from IsoNet.preprocessing.cubes import mask_mesh_seeds
+        from spIsoNet.preprocessing.cubes import mask_mesh_seeds
         num_per_tomo = len(mask_mesh_seeds(mask_data,cube_size,threshold=0.1))
         s+="--ncube {} ".format(num_per_tomo)
 

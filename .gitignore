@@ -1,7 +1,7 @@
 venv/
 data/
 build/
-IsoNet.egg-info/
+spIsoNet.egg-info/
 *.pyc
 *.mrc
 */__pycache_

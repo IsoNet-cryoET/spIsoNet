@@ -14,10 +14,15 @@
 
 # For example:
 # export RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE="python /path/to/relion_deepEMhancer_extRec.py"
-# export TF_FORCE_GPU_ALLOW_GROWTH='true'
 
 # In order to run deepEMhancer it is necessary to activate 
 # the conda environment used in deepEMhancer installation. 
+
+
+#export RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE="python /home/cii/software/spIsoNet/bin/relion_wrapper.py"
+#export CONDA_ENV="torch2-test"
+#export CUDA_VISIBLE_DEVICES="0"
+
 
 
 import os
@@ -29,6 +34,10 @@ import mrcfile
 # import fcntl
 # import errno
 
+#for isonet 
+'''
+need GPU information 
+'''
 
 def execute_external_relion(star):
 
@@ -36,33 +45,46 @@ def execute_external_relion(star):
     params += ' %s' %star
     os.system(params)     
     
-def execute_deep(sampling, dir, basename, var, half): 
-    print(CONDA_ENV)    
+def execute_deep(data_file, dir, basename, var, gpu, epochs = 1, mask_file = None, pretrained_model=None): 
+    print(CONDA_ENV) 
+    #data_file =  ' %s/%s_it%s_half%s_class001_external_reconstruct.mrc' %(dir, basename, var, half)   
+    print(f"processing {data_file}")  
     params = ' eval "$(conda shell.bash hook)" && conda activate %s && ' %CONDA_ENV     
-    params += ' deepemhancer '
-    params += ' -s %f' %(sampling)  
-    params += ' -i %s/%s_it%s_half%s_class001_external_reconstruct.mrc' %(dir, basename, var, half)       
-    params += ' -o %s/relion_external_reconstruct_deep%s.mrc' %(dir, half) 
-    params += ' -g %s -b 5' %gpu
+    params += ' spisonet.py map_refine '
+    params += data_file      
+    params += ' %s/%s_it%s_3DFSC.mrc' %(dir, basename, var) 
+    params += ' --epochs %s --n_subvolume 1000'   %(epochs) 
+    params += ' --output_dir %s' %(dir) 
+    params += ' --gpuID %s' %(gpu) 
+    if pretrained_model is not None:
+        params += ' --pretrained_model %s' %(pretrained_model)
+    if pretrained_model is not None:
+        params += ' --mask %s' %(mask_file)
+
+    #params += ' -o %s/relion_external_reconstruct_deep%s.mrc' %(dir, half) 
+    #params += ' -g %s -b 5' %gpu
 #     params += ' -p wideTarget' 
+    print(params)
     os.system(params)
 
+def execute_3dfsc(fn1,fn2,fscn,limit_res=None, mask_file=None): 
+    print(CONDA_ENV)    
+    params = ' eval "$(conda shell.bash hook)" && conda activate %s && ' %CONDA_ENV     
+    params += ' spisonet.py fsc3d '
+    params += ' %s' %(fn1)  
+    params += ' %s' %(fn2) 
+    params += ' -o %s' %(fscn)
+    if limit_res is not None:
+        params += ' --limit_res %s'%(limit_res)
+    if mask_file is not None:
+        params += ' --mask %s'%(mask_file)
+#     params += ' -p wideTarget' 
+    os.system(params)
     
 if __name__=="__main__":  
     paths = sys.argv 
     star = paths[1]
-    
-    if os.getenv('CONDA_ENV'):
-        CONDA_ENV=os.getenv('CONDA_ENV')
-    else:
-        print("Error with conda activation for deepEMhancer")
-    
-    if os.getenv('CUDA_VISIBLE_DEVICES'): 
-        gpu = os.environ['CUDA_VISIBLE_DEVICES'].split(',')[0] 
-        print("gpu = %s" %gpu)  
-    else:
-        gpu = 0
-      
+    print(paths)
     dir=os.path.dirname(star)
 
     part = star.split('/')[-1].split('_')
@@ -70,7 +92,23 @@ if __name__=="__main__":
     basename = part[0]
     iter_number = int(iter_string[2:5])
     print("iter =", iter_number)
+    half_str = part[2]
+    print('half_str',half_str)
+    #if half_str == 'half1':
+    if os.getenv('CONDA_ENV'):
+        CONDA_ENV=os.getenv('CONDA_ENV')
+    else:
+        print("Error with conda activation")
     
+    if os.getenv('CUDA_VISIBLE_DEVICES'): 
+        gpu = os.environ['CUDA_VISIBLE_DEVICES']
+        print("gpu = %s" %gpu)  
+    else:
+        import torch
+        gpu_list = list(range(torch.cuda.device_count()))
+        gpu=','.join(map(str, gpu_list))
+        print("CUDA_VISIBLE_DEVICES not found, using all GPUs in this node: %s" %gpu)  
+            
     #We assume iter < 100   
         
     if int(iter_number) <= 9: 
@@ -83,105 +121,144 @@ if __name__=="__main__":
         var = '0%d' %(iter_number)
         beforeVar = '0%d' %(iter_number-1)
 
-    
     with open("%s/%s_it%s_sampling.star" %(dir,basename,beforeVar)) as file:
         for li in file.readlines():
-           if "rlnHealpixOrder " in li: 
-              healpix = int(li.split()[1]) 
-              print("healpix = %s" %healpix)
+            if "rlnHealpixOrder " in li: 
+                healpix = int(li.split()[1]) 
+                print("healpix = %s" %healpix)
+                break
+
+
+    mask_file = None
+    with open("%s/%s_it%s_optimiser.star" %(dir,basename,beforeVar)) as file:
+        for li in file.readlines():
+            if "_rlnSolventMaskName " in li: 
+                mask_file = li.split()[1]
+                print("mask_file = %s" %mask_file)
+                break
     
     
-    # if iter_number < 1:
-    if (healpix < 4):
-         
+
+    if (healpix < 4):     
         execute_external_relion(star)   
         time.sleep(5)
-           
     else:         
-            ###sampling of the images            
+        sampling_index = None
         with open("%s/%s_it%s_data.star" %(dir,basename,beforeVar)) as f:
             for line in f.readlines():
+                if "_rlnImagePixelSize" in line:
+                    sampling_index = int(line.split()[1].split("#")[1])
                 if "opticsGroup1" in line:
-                    sampling = float(line.split()[8])
-                    #print("sampling = %s" %sampling)
+                    sampling = float(line.split()[sampling_index-1])
+                    print("pixel size = %s" %sampling)  
         
-        
-        try:        
-            file1=os.path.isfile('%s/relion_external_reconstruct_deep1.mrc' %(dir))
-            if file1 is True:
-                os.remove('%s/relion_external_reconstruct_deep1.mrc' %(dir))
-                file1 = False
-        except:
-            pass        
-        
-        try:
-            file2=os.path.isfile('%s/relion_external_reconstruct_deep2.mrc' %(dir))
-            if file2 is True:
-                os.remove('%s/relion_external_reconstruct_deep2.mrc' %(dir)) 
-                file2 = False
-        except:
-            pass        
-          
         execute_external_relion(star)   
-                   
-        for i in range (1,15):
-            mrc1 = os.path.isfile('%s/%s_it%s_half1_class001_external_reconstruct.mrc' %(dir,basename,var))  
-            if mrc1 is True:
-                break
-            else:
-                time.sleep(30)
                 
+        mrc1 = '%s/%s_it%s_half1_class001_external_reconstruct.mrc' %(dir,basename,var)
+        mrc2 = '%s/%s_it%s_half2_class001_external_reconstruct.mrc' %(dir,basename,var)
+        mrc_final1 = '%s/%s_it%s_half1_class001_unfil.mrc' %(dir,basename,var)
+        mrc_final2 = '%s/%s_it%s_half2_class001_unfil.mrc' %(dir,basename,var)
+        model1 = '%s/%s_it%s_half1_class001_external_reconstruct.pt' %(dir,basename,beforeVar)
+        model2 = '%s/%s_it%s_half2_class001_external_reconstruct.pt' %(dir,basename,beforeVar)
+
+        check=os.path.isfile(mrc1)        
+        check_final = (half_str == "class001") 
+        print("check",check)
+        print("check_final",check_final)
+        if check_final is True:
+            mrc1 = mrc_final1
+            mrc2 = mrc_final2
+
         for i in range (1,15):
-            mrc2 = os.path.isfile('%s/%s_it%s_half2_class001_external_reconstruct.mrc' %(dir,basename,var))  
-            if mrc2 is True:
-                break
-            else:
-                time.sleep(30)
-
-        check=os.path.isfile('%s/%s_it%s_half1_class001_external_reconstruct.mrc' %(dir,basename,var))        
-        
-        if check is True:                
-        
-            #open mrcfile
-            with mrcfile.open('%s/%s_it%s_half1_class001_external_reconstruct.mrc' %(dir,basename,var)) as f1:
-                emMap1 = f1.data.astype(np.float32).copy()  
-            with mrcfile.open('%s/%s_it%s_half2_class001_external_reconstruct.mrc' %(dir,basename,var)) as f2:
-                emMap2 = f2.data.astype(np.float32).copy()   
-                
-            max1_before =  emMap1.max()                  
-            max2_before =  emMap2.max()  
-              
-            
-            try:            
-                execute_deep(sampling, dir, basename, var, '1')
-            except:
-                pass
-
-            
             try:
-                execute_deep(sampling, dir, basename, var, '2')
+                with mrcfile.open(mrc2) as f2:
+                    emMap2 = f2.data.astype(np.float32).copy() 
             except:
-                pass
-            
+                print("Waiting for half2")
+                time.sleep(30)
+            #if (os.path.isfile(mrc1) or os.path.isfile(mrc_final1)) is True:
+            #    break
+            #else:
+            #    time.sleep(30)
+                
+        # for i in range (1,15):
+        #     if (os.path.isfile(mrc2) or os.path.isfile(mrc_final2)) is True:
+        #         break
+        #     else:
+        #         time.sleep(30)
+        #time.sleep(30)
 
-            with mrcfile.open('%s/relion_external_reconstruct_deep1.mrc' %(dir)) as d1:
-                emDeep1 = d1.data.astype(np.float32).copy() 
-            with mrcfile.open('%s/relion_external_reconstruct_deep2.mrc' %(dir)) as d2:
-                emDeep2 = d2.data.astype(np.float32).copy()
 
-            max1_after = emDeep1.max()
-            max2_after = emDeep2.max()
-        
-            factor1 = float(max1_after)/float(max1_before) 
-            factor2 = float(max2_after)/float(max2_before)
+
+        if ((check_final is True) or (check is True)) and (half_str == 'half1' or half_str == 'class001'):                
+            fscn='%s/%s_it%s_3DFSC.mrc' %(dir,basename,var)
+
+            with mrcfile.open(mrc1) as f1:
+                emMap1 = f1.data.astype(np.float32).copy()  
+            with mrcfile.open(mrc2) as f2:
+                emMap2 = f2.data.astype(np.float32).copy()   
+
+            with mrcfile.new(mrc1, overwrite=True) as f1:
+                f1.set_data(emMap1.astype(np.float32))
+                f1.voxel_size = tuple([sampling]*3)
+            with mrcfile.new(mrc2, overwrite=True) as f2:
+                f2.set_data(emMap2.astype(np.float32))
+                f2.voxel_size = tuple([sampling]*3)
+
+            mean1_before =  emMap1.mean()                  
+            mean2_before =  emMap2.mean()  
+            std1_before =  emMap1.std()                  
+            std2_before =  emMap2.std()  
+            print("here")
+            if check_final is True:
+                print("final_iteration, reconstruct 3dfsc to Nyquist %s" %(2*sampling))
+                execute_3dfsc(mrc1,mrc2,fscn, limit_res=2*sampling, mask_file=mask_file)
+            else:
+                execute_3dfsc(mrc1,mrc2,fscn, mask_file=mask_file)
+
+            if check_final is True:
+                print("final isonet reconstruction")
+                epochs = 10
+            else:
+                epochs = 1
+
+            if not os.path.isfile(model1):
+                print("first isonet reconstruction")
+                model1 = None
+                model2 = None
+                epochs = 10 
+
+            print(f"epochs = {epochs}")
+                
+
+            execute_deep(mrc1, dir, basename, var, gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model1)
+            execute_deep(mrc2, dir, basename, var, gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model2)
+                
+
+            if check is True:
+                out_mrc1 = '%s/corrected_%s_it%s_half1_class001_external_reconstruct.mrc' %(dir,basename,var)
+                out_mrc2 = '%s/corrected_%s_it%s_half2_class001_external_reconstruct.mrc' %(dir,basename,var)
+            else: 
+                out_mrc1 = '%s/corrected_%s_it%s_half1_class001_unfil.mrc' %(dir,basename,var)
+                out_mrc2 = '%s/corrected_%s_it%s_half2_class001_unfil.mrc' %(dir,basename,var)  
+
+
+
+            with mrcfile.open(out_mrc1) as d1:
+                    emDeep1 = d1.data.astype(np.float32).copy() 
+            with mrcfile.open(out_mrc2) as d2:
+                    emDeep2 = d2.data.astype(np.float32).copy()              
             
-            finalMap1 = emDeep1/factor1
-            finalMap2 = emDeep2/factor2
+            finalMap1 = emDeep1*float(std1_before)+mean1_before
+            finalMap2 = emDeep2*float(std2_before)+mean2_before
             
             #save mrcfile
-            with mrcfile.new('%s/%s_it%s_half1_class001_external_reconstruct.mrc' %(dir,basename,var) , overwrite=True) as fMap1:
+
+            with mrcfile.new(out_mrc1, overwrite=True) as fMap1:
                 fMap1.set_data(finalMap1.astype(np.float32))
                 fMap1.voxel_size = tuple([sampling]*3)
-            with mrcfile.new('%s/%s_it%s_half2_class001_external_reconstruct.mrc' %(dir,basename,var) , overwrite=True) as fMap2:
+            with mrcfile.new(out_mrc1 , overwrite=True) as fMap2:
                 fMap2.set_data(finalMap2.astype(np.float32))
                 fMap2.voxel_size = tuple([sampling]*3)
+     
+            

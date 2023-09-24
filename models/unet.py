@@ -135,7 +135,7 @@ class Unet(nn.Module):
 
     # def predict(self, real_data, batch_size):
     # #predict one tomogram in mrc format INPUT: mrc_file string OUTPUT: output_file(str) or <root_name>_corrected.mrc
-    #     from IsoNet.util.toTile import reform3D
+    #     from spIsoNet.util.toTile import reform3D
 
 
     #     data=np.expand_dims(real_data,axis=-1)

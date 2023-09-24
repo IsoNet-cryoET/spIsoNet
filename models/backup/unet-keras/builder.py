@@ -1,4 +1,4 @@
-from IsoNet.models.unet.blocks import conv_blocks
+from spIsoNet.models.unet.blocks import conv_blocks
 from tensorflow.keras.layers import MaxPooling2D, UpSampling2D, MaxPooling3D, UpSampling3D, AveragePooling3D
 from tensorflow.keras.layers import Concatenate
 

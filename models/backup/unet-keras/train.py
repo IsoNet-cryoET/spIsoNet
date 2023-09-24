@@ -2,8 +2,8 @@ import tensorflow as tf
 import logging
 tf.get_logger().setLevel(logging.ERROR)
 from tensorflow.keras.optimizers import Adam
-from IsoNet.models.unet.data_sequence import prepare_dataseq
-from IsoNet.models.unet.model import Unet
+from spIsoNet.models.unet.data_sequence import prepare_dataseq
+from spIsoNet.models.unet.model import Unet
 import numpy as np
 from tensorflow.keras.models import load_model
 

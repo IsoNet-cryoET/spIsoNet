@@ -6,7 +6,7 @@
 # and updated through methods of this model.
 # 
 import os
-from IsoNet.util.metadata import MetaData,Label,Item
+from spIsoNet.util.metadata import MetaData,Label,Item
 from PyQt5.QtWidgets import QHeaderView,QTableWidgetItem
 
 
@@ -76,7 +76,7 @@ class Model:
         the file name and its contents.
         '''
         self.tomogram_star = "tomograms.star"
-        self.github_addr = "https://github.com/Heng-Z/IsoNet"
+        self.github_addr = "https://github.com/Heng-Z/spIsoNet"
         self.pid_file = "pid.txt"
         #self.commands2run = []
         self.read_star()

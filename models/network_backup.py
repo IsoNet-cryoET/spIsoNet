@@ -5,10 +5,10 @@ import torch
 import os
 from .data_sequence import get_datasets, Predict_sets
 import mrcfile
-from IsoNet.preprocessing.img_processing import normalize
+from spIsoNet.preprocessing.img_processing import normalize
 import torch.nn as nn
 import logging
-from IsoNet.util.toTile import reform3D
+from spIsoNet.util.toTile import reform3D
 import sys
 from tqdm import tqdm
 import socket

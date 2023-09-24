@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from IsoNet.preprocessing.simulate import TwoDPsf
+from spIsoNet.preprocessing.simulate import TwoDPsf
 import mrcfile
 
 # def loss_wedge_mae(y_true,y_pred):
