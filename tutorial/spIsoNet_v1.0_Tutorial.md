@@ -127,6 +127,7 @@ Here is the table of GPU memory consumption. Based on previous spIsoNet experien
 | 1        | 4*      | 4       | ~7.0GB  |
 | 2        | 4*      | 1*      | ~10GB   |
 | 4        | 8*      | 1*      | ~10GB   |
+| 4        | 8       | 2       | ~5.3GB   |
 * means default values
 
 ## 3.3 continue from previous trained model
