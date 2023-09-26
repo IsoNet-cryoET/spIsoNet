@@ -206,6 +206,7 @@ class Net:
     def load(self, path):
         checkpoint = torch.load(path)
         self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.metrics["average_loss"] = checkpoint['average_loss']
 
     def load_jit(self, path):
         #Using the TorchScript format, you will be able to load the exported model and run inference without defining the model class.
