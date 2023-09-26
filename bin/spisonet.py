@@ -430,8 +430,14 @@ class ISONET:
 
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
             ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])   
-        ngpus, gpuID, gpuID_list = process_gpuID(gpuID)
+        
+        if gpuID is None:
+            import torch
+            gpu_list = list(range(torch.cuda.device_count()))
+            gpuID=','.join(map(str, gpu_list))
+            print("using all GPUs in this node: %s" %gpuID)  
 
+        ngpus, gpuID, gpuID_list = process_gpuID(gpuID)
 
         os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
         os.environ["CUDA_VISIBLE_DEVICES"]=gpuID

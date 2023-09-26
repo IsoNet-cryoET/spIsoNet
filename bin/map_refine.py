@@ -245,7 +245,7 @@ def map_refine(halfmap, mask, fsc3d, alpha, voxel_size, epochs = 10, mixed_preci
     #if iter_count > 1:
     #    network.load("{}/model_{}_iter{}.h5".format(output_dir, output_base, iter_count-1))
     from spIsoNet.models.network import Net
-    network = Net(filter_base = 64,unet_depth=3, add_last=True)
+    network = Net(filter_base = 64,unet_depth=3, add_last=False)
     if pretrained_model is not None:
         network.load(pretrained_model)
     if epochs > 0:

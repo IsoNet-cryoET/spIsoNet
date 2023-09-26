@@ -58,7 +58,7 @@ def execute_deep(data_file, dir, basename, var, gpu, epochs = 1, mask_file = Non
     params += ' --gpuID %s' %(gpu) 
     if pretrained_model is not None:
         params += ' --pretrained_model %s' %(pretrained_model)
-    if pretrained_model is not None:
+    if mask_file is not None:
         params += ' --mask %s' %(mask_file)
 
     #params += ' -o %s/relion_external_reconstruct_deep%s.mrc' %(dir, half) 
@@ -139,7 +139,7 @@ if __name__=="__main__":
     
     
 
-    if (healpix < 4):     
+    if (healpix < 2):     
         execute_external_relion(star)   
         time.sleep(5)
     else:         
@@ -220,7 +220,7 @@ if __name__=="__main__":
                 print("final isonet reconstruction")
                 epochs = 10
             else:
-                epochs = 1
+                epochs = 5
 
             if not os.path.isfile(model1):
                 print("first isonet reconstruction")

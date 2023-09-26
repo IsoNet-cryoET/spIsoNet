@@ -4,6 +4,7 @@ scipy
 fire
 tqdm
 scikit-image
+matplotlib
 #PyQt5
 ###### Requirements with Version Specifiers ######
 #scikit-image==0.17.2
