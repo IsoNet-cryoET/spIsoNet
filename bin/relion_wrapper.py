@@ -226,7 +226,7 @@ if __name__=="__main__":
                 print("first isonet reconstruction")
                 model1 = None
                 model2 = None
-                epochs = 10 
+                epochs = 5 
 
             print(f"epochs = {epochs}")
                 
@@ -254,10 +254,10 @@ if __name__=="__main__":
             
             #save mrcfile
 
-            with mrcfile.new(out_mrc1, overwrite=True) as fMap1:
+            with mrcfile.new(mrc1, overwrite=True) as fMap1:
                 fMap1.set_data(finalMap1.astype(np.float32))
                 fMap1.voxel_size = tuple([sampling]*3)
-            with mrcfile.new(out_mrc2 , overwrite=True) as fMap2:
+            with mrcfile.new(mrc2 , overwrite=True) as fMap2:
                 fMap2.set_data(finalMap2.astype(np.float32))
                 fMap2.voxel_size = tuple([sampling]*3)
      

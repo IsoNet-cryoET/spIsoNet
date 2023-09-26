@@ -143,3 +143,30 @@ The most importent parameter that affect your result in single particle spIsoNet
 Empirically, the larger alpha value will results in smoother results. Please see the following images of corrected_half1.mrc with different alpha values.
 
 <p align="center"> <img src="figures/alpha.png" width="800"> </p>
+
+# 4. Using relion external reconstruct
+This deep-learning approach spIsoNet can be used as a regularizer in the RELION refinement process. In each iteration of Relion refinement, spIsoNet can be used to perform the 3D reconstruction to generate corrected map and use that map for orientation search in relion refine process.
+
+To achieve this, the following steps should be performed. 
+
+## 4.1 Make sure spIsoNet is properlly installed in a conda environment.
+
+Install the required dependencies
+```
+conda create -n spisonet python=3.10
+conda activate spisonet 
+conda install -c "nvidia/label/cuda-11.8.0" cuda-toolkit
+pip install torch --index-url https://download.pytorch.org/whl/cu118
+pip install -r requirments.txt
+```
+
+and set up proper environment for spIsoNet
+```
+export PATH=/home/cii/software/spIsoNet/bin:$PATH
+export PYTHONPATH=/home/cii/software:$PYTHONPATH
+export RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE="python /home/cii/software/spIsoNet/bin/relion_wrapper.py"
+export CONDA_ENV="spisonet"
+```
+
+
+
