@@ -53,7 +53,7 @@ def execute_deep(data_file, dir, basename, var, gpu, epochs = 1, mask_file = Non
     params += ' spisonet.py map_refine '
     params += data_file      
     params += ' %s/%s_it%s_3DFSC.mrc' %(dir, basename, var) 
-    params += ' --epochs %s --n_subvolume 1000 --acc_batches 2  '   %(epochs) 
+    params += ' --epochs %s --n_subvolume 1000 --acc_batches 1  '   %(epochs) 
     params += ' --output_dir %s' %(dir) 
     params += ' --gpuID %s' %(gpu) 
     if pretrained_model is not None:

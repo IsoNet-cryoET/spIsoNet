@@ -135,6 +135,8 @@ The single particle spIsoNet will generate a neuronal network model named xx.pt 
 
 Once you start with the pretained model, you may also want to change the number of epoches to run. For example, the trained model is from the 10th epochs and you can train for another 10 epoch to make it equivalent to the 20 iteractions from scratch.
 
+You can also set epochs to zero to only perform prediction without further training
+
 
 ## 3.4 Alpha weighting
 

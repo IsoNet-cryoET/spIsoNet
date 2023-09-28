@@ -156,7 +156,6 @@ def ddp_train(rank, world_size, port_number, model,alpha, data_path, batch_size,
             torch.save({
                 'model_state_dict': model.module.state_dict(),
                 'average_loss': average_loss_list,
-                'epoch' : epoch
                 }, model_path)
     dist.destroy_process_group()
 
@@ -239,9 +238,14 @@ class Net:
            os.system("kill $(ps aux | grep multiprocessing.spawn | grep -v grep | awk '{print $2}')")
 
         checkpoint = torch.load(model_path)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
-
         self.metrics['average_loss'].extend(checkpoint['average_loss'])
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        torch.save({
+            'model_state_dict': checkpoint['model_state_dict'],
+            'average_loss': self.metrics['average_loss'],
+            }, model_path)
+        
+
 
     def predict(self, mrc_list, result_dir, iter_count, inverted=True, mw3d=None):    
 
