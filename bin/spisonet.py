@@ -401,8 +401,8 @@ class ISONET:
 
         """
         \ntrain neural network to correct preffered orientation\n
-        spisonet.py map_refine half1.mrc half2.mrc mask.mrc [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
-        :param input: Input name of half1
+        spisonet.py map_refine half.mrc FSC3D.mrc mask.mrc [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
+        :param input: Input name
         :param mask: Filename of a user-provided mask
         :param gpuID: The ID of gpu to be used during the training.
         :param ncpus: Number of cpu.
@@ -482,16 +482,16 @@ class ISONET:
                    n_subvolume=n_subvolume, cube_size=cube_size, pretrained_model=pretrained_model,
                    batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size,gpuID=gpuID, learning_rate=learning_rate)
         
-        logging.info("removing intermediate files")
-        files = os.listdir(output_dir)
-        import shutil
-        for item in files:
-            if item == "data" or item == "data~":
-                path = f'{output_dir}/{item}'
-                shutil.rmtree(path)
-            if item.startswith('subvolume') or item == "tmp.npy":
-                path = f'{output_dir}/{item}'
-                os.remove(path)
+        # logging.info("removing intermediate files")
+        # files = os.listdir(output_dir)
+        # import shutil
+        # for item in files:
+        #     if item == "data" or item == "data~":
+        #         path = f'{output_dir}/{item}'
+        #         shutil.rmtree(path)
+        #     if item.startswith('subvolume') or item == "tmp.npy":
+        #         path = f'{output_dir}/{item}'
+        #         os.remove(path)
         logging.info("Finished")
 
     def fsc3d(self, 
@@ -554,7 +554,7 @@ class ISONET:
             logging.info("Global resolution at FSC={} is {}".format(0.143, limit_res))
 
         limit_r = int( (2.*voxel_size) / limit_res * (half1.shape[0]/2.) + 1)
-        logging.info("Limit resolution to {} for spIsoNet 3D calculation. You can also tune this paramerter with --limit_res .".format(limit_res))
+        logging.info("Limit resolution to {} for spIsoNet 3D FSC calculation. You can also tune this paramerter with --limit_res .".format(limit_res))
 
         logging.info("calculating fast 3DFSC, this will take few minutes")
         fsc3d = ThreeD_FSC(FSC_map, limit_r,angle=float(cone_sampling_angle), n_processes=ncpus)

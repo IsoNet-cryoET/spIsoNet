@@ -202,7 +202,7 @@ def extract_subvolume(current_map, n_subvolume, crop_size, mask, output_dir, pre
 
 
 def map_refine(halfmap, mask, fsc3d, alpha, voxel_size, epochs = 10, mixed_precision = False,
-               output_dir = "results", output_base="half1", n_subvolume = 50, pretrained_model=None,
+               output_dir = "results", output_base="half", n_subvolume = 50, pretrained_model=None,
                cube_size = 64, predict_crop_size=96, batch_size = 8, acc_batches=2, gpuID="0", learning_rate= 4e-4):
 
     data_dir = output_dir+"/"+output_base+"_data"
@@ -210,8 +210,8 @@ def map_refine(halfmap, mask, fsc3d, alpha, voxel_size, epochs = 10, mixed_preci
     # from spIsoNet.util.FSC import get_rayFSC
     #fsc3d_cube = rescale_fsc(fsc3d, threshold, crop_size)
     fsc3d_cube_small = rescale_fsc(fsc3d, cube_size)
-    with mrcfile.new('fsc3d_cube_small_pre.mrc', overwrite=True) as mrc:
-        mrc.set_data(fsc3d_cube_small)
+    # with mrcfile.new('fsc3d_cube_small_pre.mrc', overwrite=True) as mrc:
+    #     mrc.set_data(fsc3d_cube_small)
     # from spIsoNet.preprocessing.img_processing import normalize
     # fsc3d_cube_small = normalize(fsc3d_cube_small,percentile = True, pmin=10, pmax=90, clip=True)
     # with mrcfile.new('fsc3d_cube_small.mrc', overwrite=True) as mrc:
@@ -247,6 +247,7 @@ def map_refine(halfmap, mask, fsc3d, alpha, voxel_size, epochs = 10, mixed_preci
     from spIsoNet.models.network import Net
     network = Net(filter_base = 64,unet_depth=3, add_last=True)
     if pretrained_model is not None:
+        print(f"loading previous model {pretrained_model}")
         network.load(pretrained_model)
     if epochs > 0:
         network.train(data_dir, output_dir, alpha=alpha, output_base=output_base, batch_size=batch_size, epochs = epochs, steps_per_epoch = 1000, 
@@ -257,7 +258,7 @@ def map_refine(halfmap, mask, fsc3d, alpha, voxel_size, epochs = 10, mixed_preci
     logging.info("Start predicting!")        
     
     
-    out_map = network.predict_map(halfmap, output_dir=output_dir, cube_size = cube_size, crop_size=predict_crop_size)
+    out_map = network.predict_map(halfmap, output_dir=output_dir, cube_size = cube_size, crop_size=predict_crop_size, output_base=output_base)
 
 
     with mrcfile.new(f"{output_dir}/corrected_{output_base}.mrc", overwrite=True) as output_mrc:

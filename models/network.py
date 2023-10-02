@@ -227,8 +227,8 @@ class Net:
         self.model.zero_grad()
 
         model_path = f"{output_dir}/{output_base}.pt"
-        if os.path.exists(model_path):
-            os.remove(model_path)
+        #if os.path.exists(model_path):
+        #    os.remove(model_path)
 
         try: 
             mp.spawn(ddp_train, args=(self.world_size, self.port_number, self.model,alpha, data_path, batch_size, acc_batches, epochs, steps_per_epoch, learning_rate, mixed_precision, model_path, fsc3d), nprocs=self.world_size)
@@ -326,7 +326,7 @@ class Net:
 
         logging.info('Done predicting')
     
-    def predict_map(self, data, output_dir, cube_size = 64, crop_size=96):
+    def predict_map(self, data, output_dir, cube_size = 64, crop_size=96, output_base=None):
      
         reform_ins = reform3D(data,cube_size,crop_size,7)
         data = reform_ins.pad_and_crop()
@@ -338,12 +338,15 @@ class Net:
         data = torch.from_numpy(data)
         print('data_shape',data.shape)
 
-        tmp_data_path = f"{output_dir}/tmp.npy"
+        if output_base is None:
+            tmp_data_path = f"{output_dir}/tmp.npy"
+        else:
+            tmp_data_path = f"{output_dir}/{output_base}.npy"
         mp.spawn(ddp_predict, args=(self.world_size, self.port_number, self.model, data, tmp_data_path), nprocs=self.world_size)
 
         outData = np.load(tmp_data_path)
         outData = outData.squeeze()
 
         outData=reform_ins.restore(outData)
-
+        os.remove(tmp_data_path)
         return outData
