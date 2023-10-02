@@ -99,15 +99,28 @@ if __name__=="__main__":
         gpu=','.join(map(str, gpu_list))
         print("CUDA_VISIBLE_DEVICES not found, using all GPUs in this node: %s" %gpu)  
 
+    if os.getenv('ISONET_START_HEALPIX'): 
+        limit_healpix = os.environ['ISONET_START_HEALPIX']
+        limit_healpix = int(limit_healpix)
+        print("limit_healpix = %s" %limit_healpix)  
+    else:
+        limit_healpix = 3
+
+
     alpha = os.getenv("ISONET_ALPHA")
     if alpha is None:
         alpha = 1
+    print(f"alpha: {alpha}")
     acc_batches = os.getenv("ISONET_ACC_BATCHES")
     if acc_batches is None:
         acc_batches = 1
     epochs = os.getenv('ISONET_EPOCHS')
     if epochs is None:
         epochs = 5
+    
+    start_epochs = os.getenv('ISONET_START_EPOCHS')
+    if start_epochs is None:
+        start_epochs = epochs
     batch_size = os.getenv("ISONET_BATCHSIZE")
 
     #We assume iter < 100   
@@ -137,7 +150,7 @@ if __name__=="__main__":
                 print("mask_file = %s" %mask_file)
                 break
     
-    use_unfil = True
+    use_unfil = False
     if use_unfil==True:
         ext = "unfil"
     else:
@@ -148,7 +161,6 @@ if __name__=="__main__":
     #model2 = '%s/%s_it%s_half2_class001_unfil.pt' %(dir,basename,beforeVar) 
     check_final = (half_str == "class001") 
 
-    limit_healpix = 3
     execute_external_relion(star)  
     debug_mode =True
     if (healpix < limit_healpix):     
@@ -211,69 +223,76 @@ if __name__=="__main__":
                                 break
             print('Resolution in previous iteration', resolution)
             print('limit resolution to FSC=0.143', limit_resolution)
-                     
-            fscn='%s/%s_it%s_3DFSC.mrc' %(dir,basename,var)
+            if resolution > limit_resolution:
+                fscn='%s/%s_it%s_3DFSC.mrc' %(dir,basename,var)
 
-            with mrcfile.open(mrc1) as f1:
-                emMap1 = f1.data.astype(np.float32).copy()  
-            with mrcfile.open(mrc2) as f2:
-                emMap2 = f2.data.astype(np.float32).copy()   
+                with mrcfile.open(mrc1) as f1:
+                    emMap1 = f1.data.astype(np.float32).copy()  
+                with mrcfile.open(mrc2) as f2:
+                    emMap2 = f2.data.astype(np.float32).copy()   
 
-            with mrcfile.new(mrc1, overwrite=True) as f1:
-                f1.set_data(emMap1.astype(np.float32))
-                f1.voxel_size = tuple([sampling]*3)
-            with mrcfile.new(mrc2, overwrite=True) as f2:
-                f2.set_data(emMap2.astype(np.float32))
-                f2.voxel_size = tuple([sampling]*3)
+                with mrcfile.new(mrc1, overwrite=True) as f1:
+                    f1.set_data(emMap1.astype(np.float32))
+                    f1.voxel_size = tuple([sampling]*3)
+                with mrcfile.new(mrc2, overwrite=True) as f2:
+                    f2.set_data(emMap2.astype(np.float32))
+                    f2.voxel_size = tuple([sampling]*3)
 
-            mean1_before =  emMap1.mean()                  
-            mean2_before =  emMap2.mean()  
-            std1_before =  emMap1.std()                  
-            std2_before =  emMap2.std()  
+                mean1_before =  emMap1.mean()                  
+                mean2_before =  emMap2.mean()  
+                std1_before =  emMap1.std()                  
+                std2_before =  emMap2.std()  
 
-            execute_3dfsc(mrc1,mrc2,fscn, limit_res=limit_resolution, mask_file=mask_file)
+                execute_3dfsc(mrc1,mrc2,fscn, limit_res=limit_resolution, mask_file=mask_file)
 
-            if not os.path.isfile(model1):
-                print(f"first isonet reconstruction, because previous iteration healpix order become {limit_healpix}")
-                model1 = None
-                model2 = None
+                if not os.path.isfile(model1):
+                    print(f"first isonet reconstruction, because previous iteration healpix order become {limit_healpix}")
+                    model1 = None
+                    model2 = None
+
+                    
+                out_mrc1 = '%s/corrected_%s_it%s_half1_class001_%s.mrc' %(dir,basename,var,ext)
+                out_mrc2 = '%s/corrected_%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext)
+
+                if debug_mode:
+                    execute_deep(mrc1, dir, basename, var, gpu, epochs = 0, mask_file = mask_file, pretrained_model = model1, batch_size = batch_size, acc_batches=acc_batches, alpha=alpha)
+                    execute_deep(mrc2, dir, basename, var, gpu, epochs = 0, mask_file = mask_file, pretrained_model = model2, batch_size = batch_size, acc_batches=acc_batches, alpha=alpha)
+
+                    shutil.move(out_mrc1, '%s/prepredicted_%s_it%s_half1_class001_%s.mrc' %(dir,basename,var,ext))
+                    shutil.move(out_mrc2, '%s/prepredicted_%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext))
+
+                if model1 is not None:
+                    execute_deep(mrc2, dir, basename, var, gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model2, batch_size = batch_size, acc_batches=acc_batches, alpha=alpha)
+                    execute_deep(mrc1, dir, basename, var, gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model1, batch_size = batch_size, acc_batches=acc_batches, alpha=alpha)
+                else:
+                    execute_deep(mrc2, dir, basename, var, gpu, epochs = start_epochs, mask_file = mask_file, pretrained_model = model2, batch_size = batch_size, acc_batches=acc_batches, alpha=alpha)
+                    execute_deep(mrc1, dir, basename, var, gpu, epochs = start_epochs, mask_file = mask_file, pretrained_model = model1, batch_size = batch_size, acc_batches=acc_batches, alpha=alpha)                    
                 
-            out_mrc1 = '%s/corrected_%s_it%s_half1_class001_%s.mrc' %(dir,basename,var,ext)
-            out_mrc2 = '%s/corrected_%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext)
+                if debug_mode:
+                    shutil.copy(mrc1, '%s/precorrect_%s_it%s_half1_class001_%s.mrc' %(dir,basename,var,ext))
+                    shutil.copy(mrc2, '%s/precorrect_%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext))   
 
-            if debug_mode:
-                execute_deep(mrc1, dir, basename, var, gpu, epochs = 0, mask_file = mask_file, pretrained_model = model1, batch_size = batch_size, acc_batches=acc_batches, alpha=alpha)
-                execute_deep(mrc2, dir, basename, var, gpu, epochs = 0, mask_file = mask_file, pretrained_model = model2, batch_size = batch_size, acc_batches=acc_batches, alpha=alpha)
+                with mrcfile.open(out_mrc1) as d1:
+                    emDeep1 = d1.data.astype(np.float32).copy() 
+                with mrcfile.open(out_mrc2) as d2:
+                    emDeep2 = d2.data.astype(np.float32).copy()              
+                
+                finalMap1 = emDeep1*float(std1_before)+mean1_before
+                finalMap2 = emDeep2*float(std2_before)+mean2_before
+                
+                #save mrcfile
 
-                shutil.move(out_mrc1, '%s/prepredicted_%s_it%s_half1_class001_%s.mrc' %(dir,basename,var,ext))
-                shutil.move(out_mrc2, '%s/prepredicted_%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext))
-
-            execute_deep(mrc2, dir, basename, var, gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model2, batch_size = batch_size, acc_batches=acc_batches, alpha=alpha)
-            execute_deep(mrc1, dir, basename, var, gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model1, batch_size = batch_size, acc_batches=acc_batches, alpha=alpha)
-            
-            if debug_mode:
-                shutil.copy(mrc1, '%s/precorrect_%s_it%s_half1_class001_%s.mrc' %(dir,basename,var,ext))
-                shutil.copy(mrc2, '%s/precorrect_%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext))   
-
-            with mrcfile.open(out_mrc1) as d1:
-                emDeep1 = d1.data.astype(np.float32).copy() 
-            with mrcfile.open(out_mrc2) as d2:
-                emDeep2 = d2.data.astype(np.float32).copy()              
-            
-            finalMap1 = emDeep1*float(std1_before)+mean1_before
-            finalMap2 = emDeep2*float(std2_before)+mean2_before
-            
-            #save mrcfile
-
-            with mrcfile.new(mrc1_overwrite, overwrite=True) as fMap1:
-                fMap1.set_data(finalMap1.astype(np.float32))
-                fMap1.voxel_size = tuple([sampling]*3)
-            with mrcfile.new(mrc2_overwrite, overwrite=True) as fMap2:
-                fMap2.set_data(finalMap2.astype(np.float32))
-                fMap2.voxel_size = tuple([sampling]*3)
-            if not debug_mode:
-                os.remove(out_mrc1)
-                os.remove(out_mrc2)  
-            print("finished spisonet reconstruction")
+                with mrcfile.new(mrc1_overwrite, overwrite=True) as fMap1:
+                    fMap1.set_data(finalMap1.astype(np.float32))
+                    fMap1.voxel_size = tuple([sampling]*3)
+                with mrcfile.new(mrc2_overwrite, overwrite=True) as fMap2:
+                    fMap2.set_data(finalMap2.astype(np.float32))
+                    fMap2.voxel_size = tuple([sampling]*3)
+                if not debug_mode:
+                    os.remove(out_mrc1)
+                    os.remove(out_mrc2)  
+                print("finished spisonet reconstruction")
+            else:
+                print("skip this iteration of spIsoNet")
      
             
