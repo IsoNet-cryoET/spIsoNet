@@ -4,18 +4,19 @@ global logger
 logger = logging.getLogger('main')
 logger.setLevel(logging.INFO)
 global refine_param, predict_param, extract_param, param_to_check, param_to_set_attr
-refine_param = [ 'normalize_percentile', 'batch_normalization', 'filter_base', 'unet_depth', 'pool', 'kernel', 'convs_per_depth', 'drop_out','noise_dir', 
-                'noise_mode', 'noise_pause', 'noise_start_iter','learning_rate', 'noise_level', 'steps_per_epoch', 'batch_size', 'epochs', 'continue_from', 
-                'preprocessing_ncpus', 'result_dir', 'continue_iter', 'log_level', 'pretrained_model', 'data_dir', 'iterations', 'gpuID', 'subtomo_star','cmd',
-                'select_subtomo_number','remove_intermediate','prefill', 'probability','arch','acc_batches','ncpus','mixed_precision']
+#refine_param = [ 'normalize_percentile', 'batch_normalization', 'filter_base', 'unet_depth', 'pool', 'kernel', 'convs_per_depth', 'drop_out','noise_dir', 
+#                'noise_mode', 'noise_pause', 'noise_start_iter','learning_rate', 'noise_level', 'steps_per_epoch', 'batch_size', 'epochs', 'continue_from', 
+#                'preprocessing_ncpus', 'result_dir', 'continue_iter', 'log_level', 'pretrained_model', 'data_dir', 'iterations', 'gpuID', 'subtomo_star','cmd',
+#                'select_subtomo_number','remove_intermediate','prefill', 'probability','arch','acc_batches','ncpus','mixed_precision']
 predict_param = ['tomo_idx', 'Ntile', 'log_level', 'normalize_percentile', 'batch_size', 'use_deconv_tomo', 'crop_size', 'cube_size', 'gpuID', 'output_dir', 'model', 'star_file']
 extract_param = ['log_level', 'cube_size', 'subtomo_star', 'subtomo_folder', 'use_deconv_tomo', 'star_file','tomo_idx','crop_size']
 deconv_param = ['star_file', 'deconv_folder','chunk_size', 'snrfalloff', 'deconvstrength', 'highpassnyquist', 'tile', 'overlap_rate', 'ncpu', 'tomo_idx']
 make_mask_param = ['star_file', 'mask_folder', 'patch_size', 'density_percentage', 'std_percentage', 'use_deconv_tomo', 'z_crop', 'tomo_idx', 'mask_boundary']
 prepare_star_param = ['number_subtomos', 'defocus', 'pixel_size', 'output_star', 'folder_name']
-map_refine_param = ['alpha','i','i2','mask','gpuID','ncpus','output_dir','limit_res','fsc_file','iterations','epochs','threshold','n_subvolume','crop_size','cube_size','mixed_precision','batch_size','acc_batches','learning_rate','predict_crop_size','cone_sampling_angle','pretrained_model']
+refine_param = ['alpha','input','mask','gpuID','ncpus','output_dir','aniso_file','epochs','n_subvolume','crop_size','cube_size','mixed_precision','batch_size','acc_batches','learning_rate','predict_crop_size','pretrained_model']
+refine_n2n_param = ['alpha','beta','h','h2','mask','gpuID','ncpus','output_dir','aniso_file','epochs','n_subvolume','crop_size','cube_size','mixed_precision','batch_size','acc_batches','learning_rate','predict_crop_size','pretrained_model']
 prepare_subtomo_star_param = ['folder_name', 'output_star', 'pixel_size', 'cube_size']
-param_to_check = refine_param + predict_param + extract_param + map_refine_param + ['self','run']
+param_to_check = refine_param + predict_param + extract_param + refine_n2n_param + ['self','run']
 param_to_set_attr = refine_param + predict_param + extract_param + ['iter_count','crop_size','cube_size','predict_cropsize','noise_dir','lr','ngpus','predict_batch_size','losses','metrics']
 class Arg:
     def __init__(self,dictionary,from_cmd=True):

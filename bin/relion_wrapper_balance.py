@@ -27,6 +27,35 @@ import shutil
 '''
 need GPU information 
 '''
+def skew_towards_edges(x, exponent=0.5):
+    # Ensure x is within the range -1 to 1
+    x = (float(x)-90)/90.
+
+    x = np.clip(x, -1, 1)
+    # Apply the skewing function
+    if x < 0:
+        result = -abs(x) ** exponent
+    else:
+        result = x ** exponent
+    return result*90+90
+
+def rebalance(star):
+    s = ""
+    with open(star) as file:
+        for line_number,li in enumerate(file.readlines()):
+            if "_rlnAngleTilt " in li:
+                tlt_index = int(li.split()[1].split("#")[1])
+            if ".mrc" in li:
+                print(li)
+                split_li = li.split()
+                tlt = skew_towards_edges(split_li[tlt_index-1], 0.8)
+                split_li[tlt_index-1] = str(tlt)
+                s+=" ".join(split_li)
+            else:
+                s+=li.strip()
+            s += "\n"
+    with open(star, 'w') as file:
+        file.write(s)
 
 def execute_external_relion(star):
 
@@ -167,11 +196,18 @@ if __name__=="__main__":
     #model2 = '%s/%s_it%s_half2_class001_unfil.pt' %(dir,basename,beforeVar) 
     check_final = (half_str == "class001") 
 
-    execute_external_relion(star)  
+ 
     debug_mode =True
-    if (healpix < limit_healpix):     
-        time.sleep(5)    
+    if (healpix < limit_healpix):   
+        shutil.copy(star, star+".backup")  
+        rebalance(star)
+        execute_external_relion(star)  
+        time.sleep(5) 
+        #rebalance("'%s/%s_it%s_data.star' %(dir,basename,beforeVar)")   
+
+
     elif (check_final is True):
+        execute_external_relion(star)
         mrc_final1 = '%s/%s_half1_class001_unfil.mrc' %(dir,basename)
         mrc_final2 = '%s/%s_half2_class001_unfil.mrc' %(dir,basename)
         final_fsc = '%s/%s_3DFSC.mrc' %(dir,basename)
@@ -184,6 +220,7 @@ if __name__=="__main__":
         print(f"spisonet.py map_refine {mrc_final1} {final_fsc} --output_dir {dir} --pretrained_model {model1} --mask {mask_file}")
         print(f"spisonet.py map_refine {mrc_final2} {final_fsc} --output_dir {dir} --pretrained_model {model2} --mask {mask_file}")
     else:         
+        execute_external_relion(star)
         mrc1_overwrite = '%s/%s_it%s_half1_class001_external_reconstruct.mrc' %(dir,basename,var)
         mrc2_overwrite = '%s/%s_it%s_half2_class001_external_reconstruct.mrc' %(dir,basename,var)
         mrc1 = '%s/%s_it%s_half1_class001_%s.mrc' %(dir,basename,var,ext)

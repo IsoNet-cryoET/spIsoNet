@@ -232,9 +232,10 @@ if __name__=="__main__":
             print('Resolution in previous iteration', resolution)
             print('limit resolution to FSC=0.143', limit_resolution)
             if limit_resolution < 20:
-                if (fsc3d is None) or (len(fsc3d)<2):
+                print(f"using FSC3D file {fsc3d}")
+                if (fsc3d is None) or (len(fsc3d)<1):
                     fscn='%s/%s_it%s_3DFSC.mrc' %(dir,basename,var)    
-                    execute_3dfsc(mrc1,mrc2,fscn, limit_res=limit_resolution, mask_file=mask_file)    
+                    execute_3dfsc(mrc1_overwrite,mrc2_overwrite, fscn, limit_res=limit_resolution, mask_file=mask_file)    
                 else:
                     fscn = fsc3d
                 print(f"using FSC3D file {fscn}")

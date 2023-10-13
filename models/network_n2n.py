@@ -3,7 +3,7 @@ import numpy as np
 from .unet import Unet
 import torch
 import os
-from .data_sequence import Train_sets_sp, Predict_sets
+from .data_sequence import Train_sets_sp_n2n, Predict_sets
 import mrcfile
 from spIsoNet.preprocessing.img_processing import normalize
 import torch.nn as nn
@@ -28,7 +28,7 @@ def find_unused_port():
     sock.close()
     return port
 
-def ddp_train(rank, world_size, port_number, model,alpha, data_path, batch_size, acc_batches, epochs, steps_per_epoch, learning_rate, mixed_precision, model_path, fsc3d):
+def ddp_train(rank, world_size, port_number, model,alpha, beta, data_path, batch_size, acc_batches, epochs, steps_per_epoch, learning_rate, mixed_precision, model_path, fsc3d):
     rotation_list_24 = [(((0,1),1),((0,2),0)), (((0,1),1),((0,2),1)), (((0,1),1),((0,2),2)), (((0,1),1),((0,2),3)), 
                     (((0,1),3),((0,2),0)), (((0,1),3),((0,2),1)), (((0,1),3),((0,2),2)), (((0,1),3),((0,2),3)), 
                     (((1,2),1),((0,2),0)), (((1,2),1),((0,2),1)), (((1,2),1),((0,2),2)), (((1,2),1),((0,2),3)), 
@@ -64,7 +64,7 @@ def ddp_train(rank, world_size, port_number, model,alpha, data_path, batch_size,
         scaler = torch.cuda.amp.GradScaler()
     
     #from chatGPT: The DistributedSampler shuffles the indices of the entire dataset, not just the portion assigned to a specific GPU. 
-    train_dataset = Train_sets_sp(data_path)
+    train_dataset = Train_sets_sp_n2n(data_path)
     train_sampler = DistributedSampler(train_dataset, shuffle=True, drop_last=True)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size_gpu, persistent_workers=True,
                                              num_workers=4, pin_memory=True, sampler=train_sampler)
@@ -83,17 +83,18 @@ def ddp_train(rank, world_size, port_number, model,alpha, data_path, batch_size,
             # have to convert to tensor because reduce needed it
             average_loss = torch.tensor(0, dtype=torch.float).to(rank)
             for i, batch in enumerate(train_loader):
-                x = batch
-                x = x.cuda()
+                x1, x2 = batch
+                x1 = x1.cuda()
+                x2 = x2.cuda()
                 optimizer.zero_grad(set_to_none=True)
                 if mixed_precision:
                     with torch.cuda.amp.autocast():
-                        preds = model(x)
+                        preds = model(x1)
                     with torch.cuda.amp.autocast(dtype=torch.float32):
                         data = torch.zeros_like(preds)
                         for i,d in enumerate(preds):
                             data[i][0] = torch.real(torch.fft.ifftn(mwshift*torch.fft.fftn(d[0])))#.astype(np.float32)
-                        loss_consistency = loss_fn(data,x)
+                        loss_consistency = loss_fn(data,x1)
                         data_rot = torch.zeros_like(preds)
                         data_e = torch.zeros_like(preds)
                         for j,d in enumerate(preds):
@@ -112,23 +113,50 @@ def ddp_train(rank, world_size, port_number, model,alpha, data_path, batch_size,
                     #if rank == 0:
                     #    print("noise_level", noise_level)
                     #noise = torch.rand(1)[0] * noise_level * torch.normal(0, 1, size=x.shape)
-                    preds = model(x)# + noise.cuda())
 
+                    preds = model(x1)# + noise.cuda())
+                    # no_grad_h2 = False
+                    # if no_grad_h2:
+                    #     with torch.no_grad():
+                    #         pred_2 = model(x2)
+                    #         data_rot_2 = torch.zeros_like(pred_2, requires_grad=False)
+                    # else:
+                    #     pred_2 = model(x2)
+                    #     data_rot_2 = torch.zeros_like(pred_2)    
+                    
                     data = torch.zeros_like(preds)
                     for j,d in enumerate(preds):
                         data[j][0] = torch.real(torch.fft.ifftn(mwshift*torch.fft.fftn(d[0])))#.astype(np.float32)
-                    loss_consistency = loss_fn(data,x)
-                   
+                    if beta > 0:
+                        loss_consistency_2 = loss_fn(data,x2)
+                        loss_consistency_1 = loss_fn(data,x1)
+                        pred_2 = model(x2)
+                        data_rot_2 = torch.zeros_like(pred_2)   
+                    else:
+                        loss_consistency_1 = loss_fn(data,x1)
+                        loss_consistency_2 = 0
+                        beta = 0
+
+ 
+
                     data_rot = torch.zeros_like(preds)
                     data_e = torch.zeros_like(preds)
                     for k,d in enumerate(preds):
                         rot = random.choice(rotation_list_24)
                         tmp = torch.rot90(d[0],rot[0][1],rot[0][0])
-                        data_rot[k][0] = torch.rot90(tmp,rot[1][1],rot[1][0])
+                        if beta > 0:
+                            tmp_2 = torch.rot90(pred_2[k][0],rot[0][1],rot[0][0])
+                            data_rot[k][0] = torch.rot90(tmp,rot[1][1],rot[1][0])
+                            data_rot_2[k][0] = torch.rot90(tmp_2,rot[1][1],rot[1][0])
                         data_e[k][0] = torch.real(torch.fft.ifftn(mwshift*torch.fft.fftn(data_rot[k][0])))#+noise[i][0]#.astype(np.float32)
                     pred_y = model(data_e)
-                    loss_equivariance = loss_fn(pred_y, data_rot)
-                    loss = alpha*loss_equivariance + loss_consistency
+                    if beta > 0:
+                        loss_equivariance_1 = loss_fn(pred_y, data_rot)
+                        loss_equivariance_2 = loss_fn(pred_y, data_rot_2)
+                    else:
+                        loss_equivariance_1 = loss_fn(pred_y, data_rot)
+                        loss_equivariance_2 = 0
+                    loss = alpha*loss_equivariance_1 + loss_consistency_1 + beta * (alpha*loss_equivariance_2 + loss_consistency_2)
                     loss = loss / acc_batches
                     loss.backward()
                 loss_item = loss.item()
@@ -223,19 +251,19 @@ class Net:
         model_scripted = torch.jit.script(self.model) # Export to TorchScript
         model_scripted.save(path) # Save
 
-    def train(self, data_path, output_dir,alpha=1, batch_size=None, output_base='tmp',
+    def train(self, data_path, output_dir,alpha, beta, batch_size=None, output_base='tmp',
               epochs = 10, steps_per_epoch=200, acc_batches =2,
               mixed_precision=False, learning_rate=3e-4, fsc3d = None):
         print('learning rate',learning_rate)
 
         self.model.zero_grad()
 
-        model_path = f"{output_dir}/{output_base}.pt"
+        model_path = f"{output_dir}/{output_base[0]}.pt"
         #if os.path.exists(model_path):
         #    os.remove(model_path)
 
         try: 
-            mp.spawn(ddp_train, args=(self.world_size, self.port_number, self.model,alpha, data_path, batch_size, acc_batches, epochs, steps_per_epoch, learning_rate, mixed_precision, model_path, fsc3d), nprocs=self.world_size)
+            mp.spawn(ddp_train, args=(self.world_size, self.port_number, self.model,alpha,beta, data_path, batch_size, acc_batches, epochs, steps_per_epoch, learning_rate, mixed_precision, model_path, fsc3d), nprocs=self.world_size)
         except KeyboardInterrupt:
            logging.info('KeyboardInterrupt: Terminating all processes...')
            dist.destroy_process_group() 

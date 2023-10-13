@@ -29,13 +29,13 @@ def fsc_filter(map,fsc3d):
     return outData
 
 def rescale_fsc(fsc3d, crop_size):
-    half_size = crop_size//2
+    #half_size = crop_size//2
     fsc3d = skimage.transform.resize(fsc3d, [crop_size,crop_size,crop_size])
-    fsc3d[fsc3d<0] = 0
+    #fsc3d[fsc3d<0] = 0
 
-    r = np.arange(crop_size)-crop_size//2
-    [Z,Y,X] = np.meshgrid(r,r,r)
-    index = np.round(np.sqrt(Z**2+Y**2+X**2))
+    #r = np.arange(crop_size)-crop_size//2
+    #[Z,Y,X] = np.meshgrid(r,r,r)
+    #index = np.round(np.sqrt(Z**2+Y**2+X**2))
 
     #if threshold is not None:
     #    fsc3d[fsc3d<threshold] = 0
@@ -53,7 +53,8 @@ def rescale_fsc(fsc3d, crop_size):
 
     #fsc3d[half_size,half_size,half_size] = 1
     fsc3d[fsc3d<0] = 0
-    fsc3d = (fsc3d - fsc3d.min()) / (fsc3d.max()-fsc3d.min())
+    if (fsc3d.max()-fsc3d.min()) >0.001:
+        fsc3d = (fsc3d - fsc3d.min()) / (fsc3d.max()-fsc3d.min())
     return fsc3d
 
 def cutoff_vol(map, voxel_size, limit_res):
@@ -182,10 +183,9 @@ def split_train_test(data_dir,batch_size=8):
         os.replace('{}/train_x/{}'.format(data_dir, all_path_x[i]), '{}/test_x/{}'.format(data_dir, all_path_x[i]) )
         os.replace('{}/train_y/{}'.format(data_dir, all_path_y[i]), '{}/test_y/{}'.format(data_dir, all_path_y[i]) )
 
-def extract_subvolume(current_map, n_subvolume, crop_size, mask, output_dir, prefix=''):
+def extract_subvolume(current_map, seeds, crop_size, output_dir, prefix=''):
     #extract subvolume
     #print(len(mask))
-    seeds=create_cube_seeds(current_map, n_subvolume, crop_size, mask)
     subtomos=crop_cubes(current_map,seeds,crop_size)
     #submasks=crop_cubes(mask,seeds, crop_size)
     mrc_list = []
@@ -232,8 +232,8 @@ def map_refine(halfmap, mask, fsc3d, alpha, voxel_size, epochs = 10, mixed_preci
 
 
     halfmap = normalize(halfmap,percentile=False)
-
-    extract_subvolume(halfmap, n_subvolume, cube_size, mask, data_dir)
+    seeds=create_cube_seeds(halfmap, n_subvolume, cube_size, mask)
+    extract_subvolume(halfmap, seeds, cube_size, data_dir)
 
 
     logging.info("Start preparing subvolumes!")
@@ -277,7 +277,68 @@ def map_refine(halfmap, mask, fsc3d, alpha, voxel_size, epochs = 10, mixed_preci
     logging.info('Done predicting')
     
 
+def map_refine_n2n(halfmap1, halfmap2, mask, fsc3d, alpha, beta, voxel_size, epochs = 10, mixed_precision = False,
+               output_dir = "results", output_base1="half1", output_base2="half2", n_subvolume = 50, pretrained_model=None,
+               cube_size = 64, predict_crop_size=96, batch_size = 8, acc_batches=2, gpuID="0", learning_rate= 4e-4):
 
+    data_dir_1 = output_dir+"/"+output_base1+"_data"
+    data_dir_2 = output_dir+"/"+output_base2+"_data"
+    mkfolder(data_dir_1)
+    mkfolder(data_dir_2)
+
+    # from spIsoNet.util.FSC import get_rayFSC
+    #fsc3d_cube = rescale_fsc(fsc3d, threshold, crop_size)
+    fsc3d_cube_small = rescale_fsc(fsc3d, cube_size)
+
+    halfmap1 = normalize(halfmap1,percentile=False)
+    halfmap2 = normalize(halfmap2,percentile=False)
+    seeds=create_cube_seeds(halfmap1, n_subvolume, cube_size, mask)
+    extract_subvolume(halfmap1, seeds, cube_size, data_dir_1)
+    extract_subvolume(halfmap2, seeds, cube_size, data_dir_2)
+
+    logging.info("Start preparing subvolumes!")
+    #get_cubes_list(fsc3d_cube_small, mrc_list, data_dir, output_dir, cube_size, cube_size)
+    #split_train_test(data_dir,batch_size=batch_size)
+    logging.info("Done preparing subvolumes!")
+
+    logging.info("Start training!")
+    #if iter_count > 1:
+    #    network.load("{}/model_{}_iter{}.h5".format(output_dir, output_base, iter_count-1))
+    from spIsoNet.models.network_n2n import Net
+    network = Net(filter_base = 64,unet_depth=3, add_last=True)
+    if pretrained_model is not None:
+        print(f"loading previous model {pretrained_model}")
+        network.load(pretrained_model)
+    if epochs > 0:
+        network.train([data_dir_1,data_dir_2], output_dir, alpha=alpha,beta=beta, output_base=[output_base1,output_base2], batch_size=batch_size, epochs = epochs, steps_per_epoch = 1000, 
+                            mixed_precision=mixed_precision, acc_batches=acc_batches, learning_rate = learning_rate, fsc3d = fsc3d_cube_small) #train based on init model and save new one as model_iter{num_iter}.h5
+    #network.save("{}/model_{}_iter{}.h5".format(output_dir, output_base, iter_count))
+    plot_metrics(network.metrics, f"{output_dir}/loss_{output_base1}.png")
+
+    logging.info("Start predicting!")        
+    
+    
+    out_map1 = network.predict_map(halfmap1, output_dir=output_dir, cube_size = cube_size, crop_size=predict_crop_size, output_base=output_base1)
+    out_map2 = network.predict_map(halfmap2, output_dir=output_dir, cube_size = cube_size, crop_size=predict_crop_size, output_base=output_base2)
+
+
+    with mrcfile.new(f"{output_dir}/corrected_{output_base1}.mrc", overwrite=True) as output_mrc:
+        output_mrc.set_data(out_map1.astype(np.float32))
+        output_mrc.voxel_size = voxel_size
+    with mrcfile.new(f"{output_dir}/corrected_{output_base2}.mrc", overwrite=True) as output_mrc:
+        output_mrc.set_data(out_map2.astype(np.float32))
+        output_mrc.voxel_size = voxel_size
+
+
+    files = os.listdir(output_dir)
+    for item in files:
+        if item == output_base1+"_data" or item == output_base1+"_data~" or item == output_base2+"_data" or item == output_base2+"_data~" :
+            path = f'{output_dir}/{item}'
+            shutil.rmtree(path)
+        if item.startswith('subvolume'):
+            path = f'{output_dir}/{item}'
+            os.remove(path)      
+    logging.info('Done predicting')
 
     # for iter_count in range(0,iterations+1):
     #     if iter_count == 0:

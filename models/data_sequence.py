@@ -30,6 +30,33 @@ class Train_sets_sp(Dataset):
     def __len__(self):
         return len(self.path_all)
 
+class Train_sets_sp_n2n(Dataset):
+    def __init__(self, data_dir, max_length = None, shuffle=True, prefix = "train"):
+        super(Train_sets_sp_n2n, self).__init__()
+        # self.path_all = []
+        p1 = '{}/'.format(data_dir[0])
+        p2 = '{}/'.format(data_dir[1])
+
+        self.path_all1 = sorted([p1+f for f in os.listdir(p1)])
+        self.path_all2 = sorted([p2+f for f in os.listdir(p2)])
+
+    def __getitem__(self, idx):
+        with mrcfile.open(self.path_all1[idx]) as mrc:
+            rx = mrc.data[np.newaxis,:,:,:]
+        rx = torch.as_tensor(rx.copy())
+
+        with mrcfile.open(self.path_all2[idx]) as mrc:
+            ry = mrc.data[np.newaxis,:,:,:]
+        ry = torch.as_tensor(ry.copy())
+        prob = np.random.rand()
+        if prob>0.5:
+            return rx,ry
+        if prob<0.5:
+            return ry,rx
+
+    def __len__(self):
+        return len(self.path_all1)
+
 class Train_sets(Dataset):
     def __init__(self, data_dir, max_length = None, shuffle=True, prefix = "train"):
         super(Train_sets, self).__init__()

@@ -3,7 +3,6 @@ import numpy as np
 import mrcfile
 
 from spIsoNet.preprocessing.simulate import apply_wedge_dcube as apply_wedge
-from spIsoNet.util.noise_generator import make_noise_one
 # from spIsoNet.preprocessing.simulate import apply_wedge
 
 def create_cube_seeds(img3D,nCubesPerImg,cubeSideLen,mask=None):
@@ -161,6 +160,7 @@ class DataCubes:
                         return res
                     noise_volume = np.array([read_vol(path_noise[j]) for j in path_index])
                 else:
+                    from spIsoNet.util.noise_generator import make_noise_one
                     noise_volume = make_noise_one(cubesize = self.cubeSideLen,mode=self.noise_mode)
                 
                 self.__cubesX += self.noise_level * noise_volume / np.std(noise_volume)

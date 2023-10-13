@@ -379,9 +379,9 @@ class ISONET:
     #         f.write(' '.join(sys.argv[0:]) + '\n')
     #     run(d_args)
 
-    def map_refine(self, 
+    def refine(self, 
                    input: str,
-                   aniso_file: str, 
+                   aniso_file: str = None, 
                    mask: str=None, 
 
                    gpuID: str=None, 
@@ -473,30 +473,141 @@ class ISONET:
         else:
             with mrcfile.open(mask, 'r') as mrc:
                 mask_vol = mrc.data
-
-        with mrcfile.open(aniso_file, 'r') as mrc:
-            fsc3d = mrc.data
+        if aniso_file is None:
+            logging.warning("No fsc3d is provided. Only denoising")
+            fsc3d = np.ones(half_map.shape, dtype = np.float32)
+        else:
+            with mrcfile.open(aniso_file, 'r') as mrc:
+                fsc3d = mrc.data
 
         map_refine(half_map, mask_vol, fsc3d, alpha = alpha,  voxel_size=voxel_size, output_dir=output_dir, 
                    output_base=output_base, mixed_precision=mixed_precision, epochs = epochs,
                    n_subvolume=n_subvolume, cube_size=cube_size, pretrained_model=pretrained_model,
                    batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size,gpuID=gpuID, learning_rate=learning_rate)
         
-        # logging.info("removing intermediate files")
-        # files = os.listdir(output_dir)
-        # import shutil
-        # for item in files:
-        #     if item == "data" or item == "data~":
-        #         path = f'{output_dir}/{item}'
-        #         shutil.rmtree(path)
-        #     if item.startswith('subvolume') or item == "tmp.npy":
-        #         path = f'{output_dir}/{item}'
-        #         os.remove(path)
+        logging.info("Finished")
+
+    def refine_n2n(self, 
+                   h1: str,
+                   h2: str,
+                   aniso_file: str = None, 
+                   mask: str=None, 
+
+                   gpuID: str=None, 
+                   alpha: float=1,
+                   beta: float=0.1,
+                   ncpus: int=16, 
+                   output_dir: str="isonet_maps",
+                   pretrained_model: str=None,
+
+                   epochs: int=50,
+                   n_subvolume: int=1000, 
+                   cube_size: int=64,
+                   predict_crop_size: int=80,
+                   batch_size: int=None, 
+                   acc_batches: int=1,
+                   learning_rate: float=3e-4
+                   ):
+
+        """
+        \ntrain neural network to correct preffered orientation\n
+        spisonet.py map_refine half.mrc FSC3D.mrc mask.mrc [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
+        :param input: Input name
+        :param mask: Filename of a user-provided mask
+        :param gpuID: The ID of gpu to be used during the training.
+        :param ncpus: Number of cpu.
+        :param output_dir: The name of directory to save output maps
+        :param fsc_file: 3DFSC file if not set, isonet will generate one.
+        :param epochs: Number of epochs for each iteration. This value can be increase (maybe to 10) to get (maybe) better result.
+        :param n_subvolume: Number of subvolumes 
+        :param predict_crop_size: The size of subvolumes, should be larger then the cube_size
+        :param cube_size: Size of cubes for training, should be divisible by 16, e.g. 32, 64, 80.
+        :param batch_size: Size of the minibatch. If None, batch_size will be the max(2 * number_of_gpu,4). batch_size should be divisible by the number of gpu.
+        :param acc_batches: If this value is set to 2 (or more), accumulate gradiant will be used to save memory consumption.  
+        :param learning_rate: learning rate. Default learning rate is 3e-4 while previous spIsoNet tomography used 3e-4 as learning rate
+        """
+        #TODO
+        #mixed precision does not work for torch.FFT
+        mixed_precision = False
+
+        from spIsoNet.util.utils import mkfolder
+        from spIsoNet.preprocessing.img_processing import normalize
+        from spIsoNet.bin.map_refine import map_refine_n2n
+        from spIsoNet.util.utils import process_gpuID
+        from multiprocessing import cpu_count
+        import mrcfile
+        import numpy as np
+
+        logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
+            ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])   
+        
+        if gpuID is None:
+            import torch
+            gpu_list = list(range(torch.cuda.device_count()))
+            gpuID=','.join(map(str, gpu_list))
+            print("using all GPUs in this node: %s" %gpuID)  
+
+        ngpus, gpuID, gpuID_list = process_gpuID(gpuID)
+
+        os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+        os.environ["CUDA_VISIBLE_DEVICES"]=gpuID
+
+        if batch_size is None:
+            if ngpus == 1:
+                batch_size = 4
+            else:
+                batch_size = 2 * len(gpuID_list)
+
+        cpu_system = cpu_count()
+        if cpu_system < ncpus:
+            logging.info("requested number of cpus is more than the number of the cpu cores in the system")
+            logging.info(f"setting ncpus to {cpu_system}")
+            ncpus = cpu_system
+
+        mkfolder(output_dir,remove=False)
+
+        output_base1 = h1.split('/')[-1]
+        output_base1 = output_base1.split('.')[:-1]
+        output_base1 = "".join(output_base1)
+
+        output_base2 = h2.split('/')[-1]
+        output_base2 = output_base2.split('.')[:-1]
+        output_base2 = "".join(output_base2)
+
+        with mrcfile.open(h1, 'r') as mrc:
+            halfmap1 = normalize(mrc.data,percentile=False)
+            voxel_size = mrc.voxel_size.x
+            if voxel_size == 0:
+                voxel_size = 1
+        with mrcfile.open(h2, 'r') as mrc:
+            halfmap2 = normalize(mrc.data,percentile=False)
+
+        logging.info("voxel_size {}".format(voxel_size))
+
+        if mask is None:
+            mask_vol = np.ones(halfmap1.shape, dtype = np.float32)
+            logging.warning("No mask is provided, please consider providing a soft mask")
+        else:
+            with mrcfile.open(mask, 'r') as mrc:
+                mask_vol = mrc.data
+
+        if aniso_file is None:
+            logging.warning("No fsc3d is provided. Only denoising")
+            fsc3d = np.ones(halfmap1.shape, dtype = np.float32)
+        else:
+            with mrcfile.open(aniso_file, 'r') as mrc:
+                fsc3d = mrc.data
+
+        map_refine_n2n(halfmap1,halfmap2, mask_vol, fsc3d, alpha = alpha,beta=beta,  voxel_size=voxel_size, output_dir=output_dir, 
+                   output_base1=output_base1, output_base2=output_base2, mixed_precision=mixed_precision, epochs = epochs,
+                   n_subvolume=n_subvolume, cube_size=cube_size, pretrained_model=pretrained_model,
+                   batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size,gpuID=gpuID, learning_rate=learning_rate)
+        
         logging.info("Finished")
 
     def fsc3d(self, 
-                   i: str,
-                   i2: str, 
+                   h: str,
+                   h2: str, 
                    mask: str=None, 
                    o: str="FSC3D.mrc",
                    ncpus: int=16, 
@@ -507,8 +618,8 @@ class ISONET:
         """
         \ntrain neural network to correct preffered orientation\n
         spisonet.py map_refine half1.mrc half2.mrc mask.mrc [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
-        :param i: Input name of half1
-        :param i2: Input name of half2
+        :param h: Input name of half1
+        :param h2: Input name of half2
         :param mask: Filename of a user-provided mask
         :param ncpus: Number of cpu.
         :param limit_res: The resolution limit for recovery, default is the resolution of the map.
@@ -531,13 +642,13 @@ class ISONET:
             logging.info(f"setting ncpus to {cpu_system}")
             ncpus = cpu_system
 
-        with mrcfile.open(i, 'r') as mrc:
+        with mrcfile.open(h, 'r') as mrc:
             half1 = normalize(mrc.data,percentile=False)
             voxel_size = mrc.voxel_size.x
             if voxel_size == 0:
                 voxel_size = 1
 
-        with mrcfile.open(i2, 'r') as mrc:
+        with mrcfile.open(h2, 'r') as mrc:
             half2 = normalize(mrc.data,percentile=False)
 
 
