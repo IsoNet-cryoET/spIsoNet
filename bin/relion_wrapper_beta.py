@@ -284,7 +284,7 @@ if __name__=="__main__":
             else:
                 out_mrc1 = '%s/corrected_%s_it%s_half1_class001_%s.mrc' %(dir,basename,var,ext)
                 out_mrc2 = '%s/corrected_%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext)                
-
+            time.sleep(5)
             for i in range (1,15):
                 try:
                     with mrcfile.open(mrc2) as f2:
@@ -293,7 +293,7 @@ if __name__=="__main__":
                         pass#f2.data.astype(np.float32).copy() 
                 except:
                     print("Waiting for half2")
-                    time.sleep(30)
+                    time.sleep(10)
 
             #Force write pixelsize
             with mrcfile.open(mrc1) as f1:
