@@ -3,7 +3,7 @@
 
 import numpy as np
 import mrcfile
-from numpy.fft import fftshift, fftn
+from numpy.fft import fftshift, fftn, ifftn
 from multiprocessing import Pool
 import numpy as np
 from scipy.spatial import cKDTree
@@ -21,6 +21,32 @@ def recommended_resolution(fsc3d, voxel_size, threshold = 0.5):
         if a[i] < threshold:
             return center/(i+1)*2 * voxel_size
     return 2 * voxel_size
+
+
+def get_sphere(rad,dim):
+    F_map = np.zeros([dim,dim,dim], dtype = np.float32)
+
+    r = np.arange(dim)-dim//2
+
+    [Z,Y,X] = np.meshgrid(r,r,r)
+    index = np.round(np.sqrt(Z**2+Y**2+X**2))
+
+    for i in range(dim//2):
+        if i < rad-1:
+            F_map[index==i] = 1
+        elif i == rad:
+            F_map[index==i] = 0.5
+
+    return F_map
+
+def apply_F_filter(input_map,F_map):
+
+    F_input = fftn(input_map)
+    out = ifftn(F_input*fftshift(F_map))
+    out =  np.real(out).astype(np.float32)
+    return out
+
+
 
 def get_rayFSC(data, limit_r, n_sampling= 3, preserve_prec = 50):
     if preserve_prec < 5:

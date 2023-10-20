@@ -38,7 +38,7 @@ def execute_deep(data_file,fsc3d, dir, gpu, epochs = 1, mask_file = None, pretra
     #data_file =  ' %s/%s_it%s_half%s_class001_external_reconstruct.mrc' %(dir, basename, var, half)   
     print(f"processing {data_file}")  
     params = ' eval "$(conda shell.bash hook)" && conda activate %s && ' %CONDA_ENV     
-    params += ' spisonet.py map_refine '
+    params += ' spisonet.py refine '
     params += data_file      
     params += ' %s' %(fsc3d) 
     params += ' --epochs %s --n_subvolume 1000'   %(epochs)

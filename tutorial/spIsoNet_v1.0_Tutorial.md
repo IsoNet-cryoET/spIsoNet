@@ -172,3 +172,56 @@ export CONDA_ENV="spisonet"
 
 
 
+```
+# This need 
+
+CONDA_ENV
+CUDA_VISIBLE_DEVICES
+```
+
+```
+# if ISONET_SEPERATE is False, the two half map will pass through the same network. Set this option to False enables the noise2nosie based denoising and faster processing time.
+# if ISONET_SEPERATE is True, it will perserve independency for the halfmaps and the neural networks, but not allow for the noise2noise based denoising
+
+ISONET_SEPERATE=FALSE
+```
+
+```
+# ISONET_BETA value will define the denoising level of the network, setting this to zero will prevent the noise2noise based denoising
+
+ISONET_BETA=0.5
+```
+
+```
+# ISONET_ALPHA value define the balance between the data consistency loss and rotation equivariance loss. Default value 1 should work for most cases. Setting this to zero is not recommand and will ignore rotation equivariance loss. 
+
+ISONET_ALPHA=1
+```
+
+```
+# This need be choose one
+
+ISONET_START_HEALPIX=3
+ISONET_START_RESOLUTION=3
+```
+
+```
+# This need 
+
+ISONET_RETRAIN_EACH_ITER=False
+```
+
+```
+# This need 
+
+ISONET_EPOCHS=10
+ISONET_START_EPOCHS=10
+```
+
+```
+# This need 
+
+ISONET_BATCH_SIZE=
+ISONET_ACC_BATCHES=2
+```
+

@@ -309,9 +309,25 @@ def map_refine_n2n(halfmap1, halfmap2, mask, fsc3d, alpha, beta, voxel_size, epo
     if pretrained_model is not None:
         print(f"loading previous model {pretrained_model}")
         network.load(pretrained_model)
+    debug_mode = False
     if epochs > 0:
-        network.train([data_dir_1,data_dir_2], output_dir, alpha=alpha,beta=beta, output_base=[output_base1,output_base2], batch_size=batch_size, epochs = epochs, steps_per_epoch = 1000, 
+        if debug_mode:
+            for i in range(epochs):
+                network.train([data_dir_1,data_dir_2], output_dir, alpha=alpha,beta=beta, output_base=[output_base1,output_base2], batch_size=batch_size, epochs = 1, steps_per_epoch = 1000, 
                             mixed_precision=mixed_precision, acc_batches=acc_batches, learning_rate = learning_rate, fsc3d = fsc3d_cube_small) #train based on init model and save new one as model_iter{num_iter}.h5
+                out_map1 = network.predict_map(halfmap1, output_dir=output_dir, cube_size = cube_size, crop_size=predict_crop_size, output_base=output_base1)
+                out_map2 = network.predict_map(halfmap2, output_dir=output_dir, cube_size = cube_size, crop_size=predict_crop_size, output_base=output_base2)
+                with mrcfile.new(f"{output_dir}/corrected_epoch{i+1}_{output_base1}.mrc", overwrite=True) as output_mrc:
+                    output_mrc.set_data(out_map1.astype(np.float32))
+                    output_mrc.voxel_size = voxel_size
+                with mrcfile.new(f"{output_dir}/corrected_epoch{i+1}_{output_base2}.mrc", overwrite=True) as output_mrc:
+                    output_mrc.set_data(out_map2.astype(np.float32))
+                    output_mrc.voxel_size = voxel_size
+        else:
+            network.train([data_dir_1,data_dir_2], output_dir, alpha=alpha,beta=beta, output_base=[output_base1,output_base2], batch_size=batch_size, epochs = epochs, steps_per_epoch = 1000, 
+                mixed_precision=mixed_precision, acc_batches=acc_batches, learning_rate = learning_rate, fsc3d = fsc3d_cube_small) #train based on init model and save new one as model_iter{num_iter}.h5
+
+
     #network.save("{}/model_{}_iter{}.h5".format(output_dir, output_base, iter_count))
     plot_metrics(network.metrics, f"{output_dir}/loss_{output_base1}.png")
 

@@ -127,13 +127,13 @@ def ddp_train(rank, world_size, port_number, model,alpha, beta, data_path, batch
                     data = torch.zeros_like(preds)
                     for j,d in enumerate(preds):
                         data[j][0] = torch.real(torch.fft.ifftn(mwshift*torch.fft.fftn(d[0])))#.astype(np.float32)
+                    loss_consistency_1 = loss_fn(data,x1)
+
                     if beta > 0:
                         loss_consistency_2 = loss_fn(data,x2)
-                        loss_consistency_1 = loss_fn(data,x1)
                         pred_2 = model(x2)
                         data_rot_2 = torch.zeros_like(pred_2)   
                     else:
-                        loss_consistency_1 = loss_fn(data,x1)
                         loss_consistency_2 = 0
                         beta = 0
 
@@ -144,9 +144,9 @@ def ddp_train(rank, world_size, port_number, model,alpha, beta, data_path, batch
                     for k,d in enumerate(preds):
                         rot = random.choice(rotation_list_24)
                         tmp = torch.rot90(d[0],rot[0][1],rot[0][0])
+                        data_rot[k][0] = torch.rot90(tmp,rot[1][1],rot[1][0])
                         if beta > 0:
                             tmp_2 = torch.rot90(pred_2[k][0],rot[0][1],rot[0][0])
-                            data_rot[k][0] = torch.rot90(tmp,rot[1][1],rot[1][0])
                             data_rot_2[k][0] = torch.rot90(tmp_2,rot[1][1],rot[1][0])
                         data_e[k][0] = torch.real(torch.fft.ifftn(mwshift*torch.fft.fftn(data_rot[k][0])))#+noise[i][0]#.astype(np.float32)
                     pred_y = model(data_e)
@@ -261,7 +261,7 @@ class Net:
         model_path = f"{output_dir}/{output_base[0]}.pt"
         #if os.path.exists(model_path):
         #    os.remove(model_path)
-
+        print(data_path)
         try: 
             mp.spawn(ddp_train, args=(self.world_size, self.port_number, self.model,alpha,beta, data_path, batch_size, acc_batches, epochs, steps_per_epoch, learning_rate, mixed_precision, model_path, fsc3d), nprocs=self.world_size)
         except KeyboardInterrupt:

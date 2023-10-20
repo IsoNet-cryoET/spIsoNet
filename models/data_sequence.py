@@ -49,7 +49,7 @@ class Train_sets_sp_n2n(Dataset):
             ry = mrc.data[np.newaxis,:,:,:]
         ry = torch.as_tensor(ry.copy())
         prob = np.random.rand()
-        if prob>0.5:
+        if prob>=0.5:
             return rx,ry
         if prob<0.5:
             return ry,rx

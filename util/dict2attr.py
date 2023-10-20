@@ -46,8 +46,8 @@ def load_args_from_json(file_name):
     return Arg(encoded,from_cmd=False)
 
 def check_parse(args_list):
-    if args_list[0] in ['refine','predict','extract','deconv','make_mask','map_refine','prepare_star','extract','prepare_subtomo_star','check','gui']:
-        if args_list[0] in ['refine','predict','extract','deconv','make_mask','prepare_star','extract','prepare_subtomo_star','map_refine']:
+    if args_list[0] in ['refine','predict','extract','deconv','make_mask','map_n2n','prepare_star','extract','prepare_subtomo_star','check','gui']:
+        if args_list[0] in ['refine','predict','extract','deconv','make_mask','prepare_star','extract','prepare_subtomo_star','map_n2n']:
             check_list = eval(args_list[0]+'_param') + ['help']
         else:
             check_list = None
