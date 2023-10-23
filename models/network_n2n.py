@@ -258,12 +258,14 @@ class Net:
 
         self.model.zero_grad()
 
-        model_path = f"{output_dir}/{output_base[0]}.pt"
+        model_path = f"{output_dir}/{output_base}.pt"
         #if os.path.exists(model_path):
         #    os.remove(model_path)
         print(data_path)
         try: 
-            mp.spawn(ddp_train, args=(self.world_size, self.port_number, self.model,alpha,beta, data_path, batch_size, acc_batches, epochs, steps_per_epoch, learning_rate, mixed_precision, model_path, fsc3d), nprocs=self.world_size)
+            mp.spawn(ddp_train, args=(self.world_size, self.port_number, self.model,alpha,beta,
+                                       data_path, batch_size, acc_batches, epochs, steps_per_epoch, learning_rate, 
+                                       mixed_precision, model_path, fsc3d), nprocs=self.world_size)
         except KeyboardInterrupt:
            logging.info('KeyboardInterrupt: Terminating all processes...')
            dist.destroy_process_group() 

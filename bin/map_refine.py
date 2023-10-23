@@ -286,6 +286,12 @@ def map_refine_n2n(halfmap1, halfmap2, mask, fsc3d, alpha, beta, voxel_size, epo
     mkfolder(data_dir_1)
     mkfolder(data_dir_2)
 
+    output_base0 = ""
+    for count in range(len(output_base1)):
+        if output_base1[count] == output_base2[count]:
+            output_base0 += output_base1[count]
+    print(output_base0)
+
     # from spIsoNet.util.FSC import get_rayFSC
     #fsc3d_cube = rescale_fsc(fsc3d, threshold, crop_size)
     fsc3d_cube_small = rescale_fsc(fsc3d, cube_size)
@@ -313,7 +319,7 @@ def map_refine_n2n(halfmap1, halfmap2, mask, fsc3d, alpha, beta, voxel_size, epo
     if epochs > 0:
         if debug_mode:
             for i in range(epochs):
-                network.train([data_dir_1,data_dir_2], output_dir, alpha=alpha,beta=beta, output_base=[output_base1,output_base2], batch_size=batch_size, epochs = 1, steps_per_epoch = 1000, 
+                network.train([data_dir_1,data_dir_2], output_dir, alpha=alpha,beta=beta, output_base=output_base0, batch_size=batch_size, epochs = 1, steps_per_epoch = 1000, 
                             mixed_precision=mixed_precision, acc_batches=acc_batches, learning_rate = learning_rate, fsc3d = fsc3d_cube_small) #train based on init model and save new one as model_iter{num_iter}.h5
                 out_map1 = network.predict_map(halfmap1, output_dir=output_dir, cube_size = cube_size, crop_size=predict_crop_size, output_base=output_base1)
                 out_map2 = network.predict_map(halfmap2, output_dir=output_dir, cube_size = cube_size, crop_size=predict_crop_size, output_base=output_base2)
@@ -324,7 +330,7 @@ def map_refine_n2n(halfmap1, halfmap2, mask, fsc3d, alpha, beta, voxel_size, epo
                     output_mrc.set_data(out_map2.astype(np.float32))
                     output_mrc.voxel_size = voxel_size
         else:
-            network.train([data_dir_1,data_dir_2], output_dir, alpha=alpha,beta=beta, output_base=[output_base1,output_base2], batch_size=batch_size, epochs = epochs, steps_per_epoch = 1000, 
+            network.train([data_dir_1,data_dir_2], output_dir, alpha=alpha,beta=beta, output_base=output_base0, batch_size=batch_size, epochs = epochs, steps_per_epoch = 1000, 
                 mixed_precision=mixed_precision, acc_batches=acc_batches, learning_rate = learning_rate, fsc3d = fsc3d_cube_small) #train based on init model and save new one as model_iter{num_iter}.h5
 
 
