@@ -156,7 +156,6 @@ if __name__=="__main__":
     gpu = parse_env("CUDA_VISIBLE_DEVICES", "string", gpu_list)
     CONDA_ENV = parse_env("CONDA_ENV", "string", None)
     whitening = parse_env("ISONET_WHITENING", "bool", True)
-    whitening_low = parse_env("ISONET_WHITENING_LOW", "float", 10)
     retrain = parse_env("ISONET_RETRAIN_EACH_ITER", "bool", False)
     beta = parse_env("ISONET_BETA", "float", 0.5)
     alpha = parse_env("ISONET_ALPHA", "float", 1)
@@ -184,11 +183,19 @@ if __name__=="__main__":
                 print("mask_file = %s" %mask_file)
                 break
        
+    
+    execute_external_relion(sys.argv[1])     
+    time.sleep(5)
+    for i in range (1,15):
+        try:
+            with mrcfile.open('%s/%s_it%s_half2_class001_external_reconstruct.mrc' %(dir,basename,var)) as f2:
+                pass
+        except:
+            print("Waiting for half2")
+            time.sleep(10)
+
     check_final = (half_str == "class001") 
-
-    execute_external_relion(sys.argv[1]) 
-
-    if (check_final is True):
+    if check_final is True:
         mrc_final1 = '%s/%s_half1_class001_unfil.mrc' %(dir,basename)
         mrc_final2 = '%s/%s_half2_class001_unfil.mrc' %(dir,basename)
         final_fsc = '%s/%s_3DFSC.mrc' %(dir,basename)
@@ -200,20 +207,92 @@ if __name__=="__main__":
         print(f"spisonet.py fsc3d {mrc_final1} {mrc_final2} -o {final_fsc}")
         print(f"spisonet.py map_refine {mrc_final1} {final_fsc} --output_dir {dir} --mask {mask_file}")
         print(f"spisonet.py map_refine {mrc_final2} {final_fsc} --output_dir {dir} --mask {mask_file}")
-    elif (healpix < limit_healpix):
-        time.sleep(5)    
+    print(half_str == 'half1')
+    if half_str == 'half1':
+            
 
-    else:
-        mrc_initial = '%s/%s_it000_%s_class001.mrc' %(dir,basename,half_str)
-        mrc_unfil = '%s/%s_it%s_%s_class001_unfil.mrc' %(dir,basename,var,half_str)
-        mrc_unfil_backup = '%s/%s_it%s_%s_class001_unfil_backup.mrc' %(dir,basename,var,half_str)
-        mrc_overwrite = '%s/%s_it%s_%s_class001_external_reconstruct.mrc' %(dir,basename,var,half_str)
-        mrc_overwrite_backup = '%s/%s_it%s_%s_class001_external_reconstruct_backup.mrc' %(dir,basename,var,half_str)
+        mrc1_initial = '%s/%s_it000_half1_class001.mrc' %(dir,basename)
+        mrc2_initial = '%s/%s_it000_half2_class001.mrc' %(dir,basename)
 
-        shutil.copy(mrc_unfil, mrc_unfil_backup)
-        shutil.copy(mrc_overwrite, mrc_overwrite_backup)
+        mrc1_ext = '%s/%s_it%s_half1_class001_external_reconstruct.mrc' %(dir,basename,var)
+        mrc2_ext = '%s/%s_it%s_half2_class001_external_reconstruct.mrc' %(dir,basename,var)
 
-        if healpix <= int(lowres_end_healpix) and (check_final is False):
+        mrc1_unfil = '%s/%s_it%s_half1_class001_unfil.mrc' %(dir,basename,var)
+        mrc2_unfil = '%s/%s_it%s_half2_class001_unfil.mrc' %(dir,basename,var)
+
+        mrc1_composit = '%s/%s_it%s_half1_class001_composit.mrc' %(dir,basename,var)
+        mrc2_composit = '%s/%s_it%s_half2_class001_composit.mrc' %(dir,basename,var)
+
+        mrc1_whiten = '%s/%s_it%s_half1_class001_whiten.mrc' %(dir,basename,var)
+        mrc2_whiten = '%s/%s_it%s_half2_class001_whiten.mrc' %(dir,basename,var)
+
+        mrc1_corrected = '%s/corrected_%s_it%s_half1_class001_external_reconstruct.mrc' %(dir,basename,var)
+        mrc2_corrected = '%s/corrected_%s_it%s_half2_class001_external_reconstruct.mrc' %(dir,basename,var)
+
+        model = '%s/%s_it%s_half_class001_external_reconstruct.pt' %(dir,basename,beforeVar)
+        #shutil.copy(mrc1_unfil, mrc1_ext)
+        #shutil.copy(mrc2_unfil, mrc2_ext)
+ 
+
+        sampling_index = None
+        with open("%s/%s_it%s_data.star" %(dir,basename,beforeVar)) as f:
+            for line in f.readlines():
+                if "_rlnImagePixelSize" in line:
+                    sampling_index = int(line.split()[1].split("#")[1])
+                if "opticsGroup1" in line:
+                    sampling = float(line.split()[sampling_index-1])
+                    print("pixel size = %s" %sampling) 
+
+        limit_resolution = 2*sampling
+        start_check = 10000
+        with open("%s/%s_it%s_half1_model.star" %(dir,basename,beforeVar)) as file:
+            for line_number,li in enumerate(file.readlines()):
+                if "_rlnEstimatedResolution " in li:
+                    resolution_index = int(li.split()[1].split("#")[1])
+                if "_class001.mrc" in li:
+                    resolution = float(li.split()[resolution_index-1])
+                if "_rlnAngstromResolution" in li:
+                    Aresolution_index = int(li.split()[1].split("#")[1])
+                if "_rlnGoldStandardFsc" in li:
+                    FSC_index = int(li.split()[1].split("#")[1])
+                    start_check = line_number
+                if line_number >= start_check:
+                    line_split = li.split()
+                    if len(line_split)>FSC_index:
+                        if float(line_split[FSC_index-1])<= 0.143:
+                            limit_resolution = float(line_split[Aresolution_index-1])
+                            break
+        print('Resolution in previous iteration', resolution)
+        print('limit resolution to FSC=0.143', limit_resolution)
+
+        #Force write pixelsize
+        with mrcfile.open(mrc1_unfil) as f1:
+            emMap1 = f1.data.astype(np.float32).copy()  
+        with mrcfile.open(mrc2_unfil) as f2:
+            emMap2 = f2.data.astype(np.float32).copy()   
+    
+        # remember mean and std
+        #print("Whether whitened map is in correct absolute gray scale?")
+        mean1_before =  emMap1.mean()                  
+        mean2_before =  emMap2.mean()  
+        std1_before =  emMap1.std()                  
+        std2_before =  emMap2.std() 
+
+        with mrcfile.open(mrc1_ext) as f1:
+            emMap1 = f1.data.astype(np.float32).copy()  
+        with mrcfile.open(mrc2_ext) as f2:
+            emMap2 = f2.data.astype(np.float32).copy()   
+        emMap1 = (emMap1-emMap1.mean()) / emMap1.std() * float(std1_before) + mean1_before
+        emMap2 = (emMap2-emMap2.mean()) / emMap2.std() * float(std1_before) + mean1_before
+
+        with mrcfile.new(mrc1_ext, overwrite=True) as f1:
+            f1.set_data(emMap1.astype(np.float32))
+            f1.voxel_size = tuple([sampling]*3)
+        with mrcfile.new(mrc2_ext, overwrite=True) as f2:
+            f2.set_data(emMap2.astype(np.float32))
+            f2.voxel_size = tuple([sampling]*3)
+
+        if healpix <= int(lowres_end_healpix):
             with open("%s/%s_it000_optimiser.star" %(dir,basename)) as file:
                 for line_number,li in enumerate(file.readlines()):
                     if 'ini_high' in li:
@@ -222,109 +301,27 @@ if __name__=="__main__":
                         resolution_initial = float(li_sp[index_ini+1])
                         break
 
-            print(mrc_initial,mrc_unfil,mrc_unfil,resolution_initial)
-            execute_combine(mrc_initial,mrc_unfil,mrc_unfil,resolution_initial) 
-        shutil.copy(mrc_unfil, mrc_overwrite)
-      
-        if (half_str == 'half1'):     
-            time.sleep(5)
+            execute_combine(mrc1_initial,mrc1_ext,mrc1_composit,resolution_initial) 
+            execute_combine(mrc2_initial,mrc2_ext,mrc2_composit,resolution_initial) 
+            shutil.copy(mrc1_composit, mrc1_ext)
+            shutil.copy(mrc2_composit, mrc2_ext)
 
-            sampling_index = None
-            with open("%s/%s_it%s_data.star" %(dir,basename,beforeVar)) as f:
-                for line in f.readlines():
-                    if "_rlnImagePixelSize" in line:
-                        sampling_index = int(line.split()[1].split("#")[1])
-                    if "opticsGroup1" in line:
-                        sampling = float(line.split()[sampling_index-1])
-                        print("pixel size = %s" %sampling) 
-
-            limit_resolution = 2*sampling
-            start_check = 10000
-            with open("%s/%s_it%s_half1_model.star" %(dir,basename,beforeVar)) as file:
-                for line_number,li in enumerate(file.readlines()):
-                    if "_rlnEstimatedResolution " in li:
-                        resolution_index = int(li.split()[1].split("#")[1])
-                    if "_class001.mrc" in li:
-                        resolution = float(li.split()[resolution_index-1])
-                    if "_rlnAngstromResolution" in li:
-                        Aresolution_index = int(li.split()[1].split("#")[1])
-                    if "_rlnGoldStandardFsc" in li:
-                        FSC_index = int(li.split()[1].split("#")[1])
-                        start_check = line_number
-                    if line_number >= start_check:
-                        line_split = li.split()
-                        if len(line_split)>FSC_index:
-                            if float(line_split[FSC_index-1])<= 0.143:
-                                limit_resolution = float(line_split[Aresolution_index-1])
-                                break
-            print('Resolution in previous iteration', resolution)
-            print('limit resolution to FSC=0.143', limit_resolution)
-
-            if limit_resolution < 10:
-
-                use_unfil = True
-                if use_unfil:
-                    ext = "unfil"
-                else:
-                    ext = "external_reconstruct"    
-                mrc1_overwrite = '%s/%s_it%s_half1_class001_external_reconstruct.mrc' %(dir,basename,var)
-                mrc2_overwrite = '%s/%s_it%s_half2_class001_external_reconstruct.mrc' %(dir,basename,var)
-                mrc1 = '%s/%s_it%s_half1_class001_%s.mrc' %(dir,basename,var,ext)
-                mrc2 = '%s/%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext)
-                mrc1_whiten = '%s/%s_it%s_half1_class001_%s_whiten.mrc' %(dir,basename,var,ext)
-                mrc2_whiten = '%s/%s_it%s_half2_class001_%s_whiten.mrc' %(dir,basename,var,ext)
+        if (healpix >= limit_healpix) and (limit_resolution < 10):
 
                 # whiten
                 if whitening:
-                    execute_whitening(mrc1, mrc1_whiten, high_res=limit_resolution, low_res=whitening_low)   
-                    execute_whitening(mrc2, mrc2_whiten, high_res=limit_resolution, low_res=whitening_low) 
-                    mrc1 =  mrc1_whiten
-                    mrc2 =  mrc2_whiten
-                    out_mrc1 = '%s/corrected_%s_it%s_half1_class001_%s_whiten.mrc' %(dir,basename,var,ext)
-                    out_mrc2 = '%s/corrected_%s_it%s_half2_class001_%s_whiten.mrc' %(dir,basename,var,ext)
-                else:
-                    out_mrc1 = '%s/corrected_%s_it%s_half1_class001_%s.mrc' %(dir,basename,var,ext)
-                    out_mrc2 = '%s/corrected_%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext) 
-
-                for i in range (1,15):
-                    try:
-                        with mrcfile.open(mrc2) as f2:
-                            pass
-                        with mrcfile.open(mrc2_overwrite) as f2:
-                            pass
-                    except:
-                        print("Waiting for half2")
-                        time.sleep(10)
-
-                #Force write pixelsize
-                with mrcfile.open(mrc1) as f1:
-                    emMap1 = f1.data.astype(np.float32).copy()  
-                with mrcfile.open(mrc2) as f2:
-                    emMap2 = f2.data.astype(np.float32).copy()   
-                with mrcfile.new(mrc1, overwrite=True) as f1:
-                    f1.set_data(emMap1.astype(np.float32))
-                    f1.voxel_size = tuple([sampling]*3)
-                with mrcfile.new(mrc2, overwrite=True) as f2:
-                    f2.set_data(emMap2.astype(np.float32))
-                    f2.voxel_size = tuple([sampling]*3)
-
-                # remember mean and std
-                #print("Whether whitened map is in correct absolute gray scale?")
-                mean1_before =  emMap1.mean()                  
-                mean2_before =  emMap2.mean()  
-                std1_before =  emMap1.std()                  
-                std2_before =  emMap2.std()  
+                    execute_whitening(mrc1_ext, mrc1_whiten, high_res=limit_resolution)   
+                    execute_whitening(mrc2_ext, mrc2_whiten, high_res=limit_resolution) 
+                    shutil.copy(mrc1_whiten, mrc1_ext)
+                    shutil.copy(mrc2_whiten, mrc2_ext)  
+     
 
                 # execute 3dfsc
                 fscn='%s/%s_it%s_3DFSC.mrc' %(dir,basename,var)    
-                execute_3dfsc(mrc1,mrc2,fscn, limit_res=limit_resolution, mask_file=mask_file)    
+                execute_3dfsc(mrc1_ext,mrc2_ext,fscn, limit_res=limit_resolution, mask_file=mask_file)    
                 print(f"using FSC3D file {fscn}")
             
                 # looking for pretrained model
-                model = '%s/%s_it%s_half_class001_%s.pt' %(dir,basename,beforeVar,ext)
-                if whitening:
-                    model = '%s/%s_it%s_half_class001_%s_whiten.pt' %(dir,basename,beforeVar,ext)
-                print(model)
                 if not os.path.isfile(model):
                     print(f"first isonet reconstruction for {start_epochs} epochs, because previous iteration healpix order become {limit_healpix}")
                     model = None
@@ -343,22 +340,22 @@ if __name__=="__main__":
                 #     shutil.move(out_mrc2, '%s/prepredicted_%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext))
 
                 # train and predict
-                execute_deep(mrc1, mrc2, fscn, dir,  gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model, batch_size = None, acc_batches=acc_batches, alpha=alpha, beta=beta)
+                execute_deep(mrc1_ext, mrc2_ext, fscn, dir,  gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model, batch_size = None, acc_batches=acc_batches, alpha=alpha, beta=beta)
             
 
-                with mrcfile.open(out_mrc1) as d1:
+                with mrcfile.open(mrc1_corrected) as d1:
                     emDeep1 = d1.data.astype(np.float32).copy() 
-                with mrcfile.open(out_mrc2) as d2:
+                with mrcfile.open(mrc2_corrected) as d2:
                     emDeep2 = d2.data.astype(np.float32).copy()              
 
                 finalMap1 = emDeep1*float(std1_before)+mean1_before
                 finalMap2 = emDeep2*float(std2_before)+mean2_before
                 
                 #save mrcfile
-                with mrcfile.new(mrc1_overwrite, overwrite=True) as fMap1:
+                with mrcfile.new(mrc1_ext, overwrite=True) as fMap1:
                     fMap1.set_data(finalMap1.astype(np.float32))
                     fMap1.voxel_size = tuple([sampling]*3)
-                with mrcfile.new(mrc2_overwrite, overwrite=True) as fMap2:
+                with mrcfile.new(mrc2_ext, overwrite=True) as fMap2:
                     fMap2.set_data(finalMap2.astype(np.float32))
                     fMap2.voxel_size = tuple([sampling]*3)
 
@@ -373,13 +370,15 @@ if __name__=="__main__":
                     res = recommended_resolution(fsc, sampling, 0.143)
                     print(f"3DFSC resolution {res}")
                     from subprocess import check_output
-                    s = f"relion_image_handler --i {mrc1_overwrite} --o tmp.mrc --lowpass {res}; mv tmp.mrc {mrc1_overwrite}"
+                    s = f"relion_image_handler --i {mrc1_ext} --o tmp.mrc --lowpass {res}; mv tmp.mrc {mrc1_ext}"
                     check_output(s, shell=True)
-                    s = f"relion_image_handler --i {mrc2_overwrite} --o tmp.mrc --lowpass {res}; mv tmp.mrc {mrc2_overwrite}"
+                    s = f"relion_image_handler --i {mrc2_ext} --o tmp.mrc --lowpass {res}; mv tmp.mrc {mrc2_ext}"
                     check_output(s, shell=True)
 
                 print("finished spisonet reconstruction")
-            else:
-                print("skip this iteration of spIsoNet")
+        else:
+            print("skip this iteration of spIsoNet")
+    else:
+        pass
      
             

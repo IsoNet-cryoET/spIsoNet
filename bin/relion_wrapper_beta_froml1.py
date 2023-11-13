@@ -59,29 +59,6 @@ def execute_deep(mrc1, mrc2, fsc3d, dir, gpu, epochs = 1, mask_file = None, pret
     print(params)
     os.system(params)
 
-def execute_deep_seperate(mrc1,  fsc3d, dir, gpu, epochs = 1, mask_file = None, pretrained_model=None, alpha = None, acc_batches= None, batch_size = None): 
-    #data_file =  ' %s/%s_it%s_half%s_class001_external_reconstruct.mrc' %(dir, basename, var, half)   
-    params = ' eval "$(conda shell.bash hook)" && conda activate %s && ' %CONDA_ENV     
-    params += ' spisonet.py refine '
-    params += f" {mrc1} "      
-    params += ' %s' %(fsc3d) 
-    params += ' --epochs %s --n_subvolume 1000'   %(epochs)
-    if acc_batches is not None:
-        params += ' --acc_batches %s'   %(acc_batches) 
-    if batch_size is not None:
-        params += ' --batch_size %s'   %(batch_size) 
-    if alpha is not None:
-        params += ' --alpha %s'   %(alpha) 
-    params += ' --output_dir %s' %(dir) 
-    params += ' --gpuID %s' %(gpu) 
-    if pretrained_model is not None:
-        params += ' --pretrained_model %s' %(pretrained_model)
-    if mask_file is not None:
-        params += ' --mask %s' %(mask_file)
-
-    print(params)
-    os.system(params)
-
 def execute_3dfsc(fn1,fn2,fscn,limit_res=None, mask_file=None): 
     params = ' eval "$(conda shell.bash hook)" && conda activate %s && ' %CONDA_ENV     
     params += ' spisonet.py fsc3d '
@@ -145,7 +122,6 @@ def parse_env(ENV_STRING, val_type, default):
     print(f"set {ENV_STRING}={val}")
     return val
 
-
 def parse_filename(star):
     dir=os.path.dirname(star)
 
@@ -178,19 +154,17 @@ if __name__=="__main__":
 
     gpu = parse_env("CUDA_VISIBLE_DEVICES", "string", gpu_list)
     CONDA_ENV = parse_env("CONDA_ENV", "string", None)
-    whitening = parse_env("ISONET_WHITENING", "bool", False)
-    retrain = parse_env("ISONET_RETRAIN_EACH_ITER", "bool", True)
-    beta = parse_env("ISONET_BETA", "float", 0.1)
+    whitening = parse_env("ISONET_WHITENING", "bool", True)
+    retrain = parse_env("ISONET_RETRAIN_EACH_ITER", "bool", False)
+    beta = parse_env("ISONET_BETA", "float", 0.5)
     alpha = parse_env("ISONET_ALPHA", "float", 1)
     
     limit_healpix = parse_env("ISONET_START_HEALPIX", "int", 3)
     acc_batches = parse_env("ISONET_ACC_BATCHES", "int", 2)
     epochs = parse_env("ISONET_EPOCHS", "int", 5)
     start_epochs = parse_env("ISONET_START_EPOCHS", "int", 5)
-    lowres_end_healpix = parse_env("ISONET_LOWRES_END_HEALPIX", "int", 6)
-    lowpass = parse_env("ISONET_LOWPASS", "bool", True)
-    seperate = parse_env("ISONET_SEPERATE", "bool", True)
-    seperate_denoise = parse_env("ISONET_SEPERATE_DENOISE", "bool", True)
+    lowres_end_healpix = parse_env("ISONET_LOWRES_END_HEALPIX", "int", 0)
+    lowpass = parse_env("ISONET_LOWPASS", "bool", False)
 
 
     with open("%s/%s_it%s_sampling.star" %(dir,basename,beforeVar)) as file:
@@ -212,25 +186,26 @@ if __name__=="__main__":
 
     execute_external_relion(sys.argv[1]) 
 
+    mrc_initial = '%s/%s_it000_%s_class001.mrc' %(dir,basename,half_str)
+    mrc_unfil = '%s/%s_it%s_%s_class001_unfil.mrc' %(dir,basename,var,half_str)
+    mrc_unfil_backup = '%s/%s_it%s_%s_class001_unfil_backup.mrc' %(dir,basename,var,half_str)
+    mrc_overwrite = '%s/%s_it%s_%s_class001_external_reconstruct.mrc' %(dir,basename,var,half_str)
+    mrc_overwrite_backup = '%s/%s_it%s_%s_class001_external_reconstruct_backup.mrc' %(dir,basename,var,half_str)
+    shutil.copy(mrc_unfil, mrc_unfil_backup)
+    shutil.copy(mrc_overwrite, mrc_overwrite_backup)
+
     if healpix <= int(lowres_end_healpix) and (check_final is False):
-        with open("%s/%s_it000_half1_model.star" %(dir,basename)) as file:
+        with open("%s/%s_it000_optimiser.star" %(dir,basename)) as file:
             for line_number,li in enumerate(file.readlines()):
-                if "_rlnEstimatedResolution " in li:
-                    resolution_index = int(li.split()[1].split("#")[1])
-                if "_class001.mrc" in li:
-                    resolution_initial = float(li.split()[resolution_index-1])
+                if 'ini_high' in li:
+                    li_sp = li.split()
+                    index_ini = li_sp.index("--ini_high")
+                    resolution_initial = float(li_sp[index_ini+1])
+                    break
 
-        mrc_initial = '%s/%s_it000_%s_class001.mrc' %(dir,basename,half_str)
-        mrc_unfil = '%s/%s_it%s_%s_class001_unfil.mrc' %(dir,basename,var,half_str)
-        mrc_unfil_backup = '%s/%s_it%s_%s_class001_unfil_backup.mrc' %(dir,basename,var,half_str)
-        mrc_overwrite = '%s/%s_it%s_%s_class001_external_reconstruct.mrc' %(dir,basename,var,half_str)
-        mrc_overwrite_backup = '%s/%s_it%s_%s_class001_external_reconstruct_backup.mrc' %(dir,basename,var,half_str)
-
-        shutil.copy(mrc_unfil, mrc_unfil_backup)
-        shutil.copy(mrc_overwrite, mrc_overwrite_backup)
         print(mrc_initial,mrc_unfil,mrc_unfil,resolution_initial)
         execute_combine(mrc_initial,mrc_unfil,mrc_unfil,resolution_initial) 
-        shutil.copy(mrc_unfil, mrc_overwrite)
+    shutil.copy(mrc_unfil, mrc_overwrite)
         
     debug_mode =True
     if (healpix < limit_healpix):
@@ -297,7 +272,6 @@ if __name__=="__main__":
             mrc1_whiten = '%s/%s_it%s_half1_class001_%s_whiten.mrc' %(dir,basename,var,ext)
             mrc2_whiten = '%s/%s_it%s_half2_class001_%s_whiten.mrc' %(dir,basename,var,ext)
 
-
             # whiten
             if whitening:
                 execute_whitening(mrc1, mrc1_whiten, high_res=limit_resolution)   
@@ -308,14 +282,15 @@ if __name__=="__main__":
                 out_mrc2 = '%s/corrected_%s_it%s_half2_class001_%s_whiten.mrc' %(dir,basename,var,ext)
             else:
                 out_mrc1 = '%s/corrected_%s_it%s_half1_class001_%s.mrc' %(dir,basename,var,ext)
-                out_mrc2 = '%s/corrected_%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext)
+                out_mrc2 = '%s/corrected_%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext) 
+
             time.sleep(5)
-            for i in range(1,15):
+            for i in range (1,15):
                 try:
                     with mrcfile.open(mrc2) as f2:
-                        pass#f2.data.astype(np.float32).copy() 
+                        pass
                     with mrcfile.open(mrc2_overwrite) as f2:
-                        pass#f2.data.astype(np.float32).copy() 
+                        pass
                 except:
                     print("Waiting for half2")
                     time.sleep(10)
@@ -333,7 +308,7 @@ if __name__=="__main__":
                 f2.voxel_size = tuple([sampling]*3)
 
             # remember mean and std
-            print("Whether whitened map is in correct absolute gray scale?")
+            #print("Whether whitened map is in correct absolute gray scale?")
             mean1_before =  emMap1.mean()                  
             mean2_before =  emMap2.mean()  
             std1_before =  emMap1.std()                  
@@ -345,51 +320,19 @@ if __name__=="__main__":
             print(f"using FSC3D file {fscn}")
         
             # looking for pretrained model
-            if seperate:
-                model1 = '%s/%s_it%s_half1_class001_%s.pt' %(dir,basename,beforeVar,ext)
-                model2 = '%s/%s_it%s_half1_class001_%s.pt' %(dir,basename,beforeVar,ext)
-                if whitening:
-                    model1 = '%s/%s_it%s_half1_class001_%s_whiten.pt' %(dir,basename,beforeVar,ext)
-                    model2 = '%s/%s_it%s_half2_class001_%s_whiten.pt' %(dir,basename,beforeVar,ext)
-                if not os.path.isfile(model1):
-                    print(f"first isonet reconstruction for {start_epochs} epochs, because previous iteration healpix order becomes {limit_healpix}")
-                    model1 = None
-                    model2 = None
-                    epochs = start_epochs
-                if retrain:
-                    print(f"retrain network each relion iteration")
-                    model1 = None
-                    model2 = None
-                if model1 is not None:
-                    print("reuse network from previous relion iteration")            
-                execute_deep_seperate(mrc1, fscn, dir,  gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model1, batch_size = None, acc_batches=acc_batches, alpha=alpha)
-                execute_deep_seperate(mrc2, fscn, dir,  gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model2, batch_size = None, acc_batches=acc_batches, alpha=alpha)
-                
-                if seperate_denoise:
-                    shutil.copy(mrc1, '%s/precorrected_sep_%s_it%s_half1_class001_%s.mrc' %(dir,basename,var,ext))
-                    shutil.copy(mrc2, '%s/precorrected_sep_%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext))
-                    shutil.move(out_mrc1, mrc1)
-                    shutil.move(out_mrc2, mrc1)
-
-            elif (not seperate) or seperate_denoise:
-                model = '%s/%s_it%s_half_class001_%s.pt' %(dir,basename,beforeVar,ext)
-                if whitening:
-                    model = '%s/%s_it%s_half_class001_%s_whiten.pt' %(dir,basename,beforeVar,ext)
-                print(model)
-                print(os.path.isfile(model))
-                if not os.path.isfile(model):
-                    print(f"first isonet reconstruction for {start_epochs} epochs, because previous iteration healpix order become {limit_healpix}")
-                    model = None
-                    epochs = start_epochs
-                if retrain:
-                    print(f"retrain network each relion iteration")
-                    model = None
-                if model is not None:
-                    print("reuse network from previous relion iteration")
-                
-                execute_deep(mrc1, mrc2, fscn, dir,  gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model, batch_size = None, acc_batches=acc_batches, alpha=alpha, beta=beta)
-
-
+            model = '%s/%s_it%s_half_class001_%s.pt' %(dir,basename,beforeVar,ext)
+            if whitening:
+                model = '%s/%s_it%s_half_class001_%s_whiten.pt' %(dir,basename,beforeVar,ext)
+            print(model)
+            if not os.path.isfile(model):
+                print(f"first isonet reconstruction for {start_epochs} epochs, because previous iteration healpix order become {limit_healpix}")
+                model = None
+                epochs = start_epochs
+            if retrain:
+                print(f"retrain network each relion iteration")
+                model = None
+            if model is not None:
+                print("reuse network from previous relion iteration")
 
             # Use previous model for prediction
             # if debug_mode:
@@ -399,6 +342,7 @@ if __name__=="__main__":
             #     shutil.move(out_mrc2, '%s/prepredicted_%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext))
 
             # train and predict
+            execute_deep(mrc1, mrc2, fscn, dir,  gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model, batch_size = None, acc_batches=acc_batches, alpha=alpha, beta=beta)
          
 
             with mrcfile.open(out_mrc1) as d1:
