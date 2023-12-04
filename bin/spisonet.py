@@ -265,13 +265,15 @@ class ISONET:
         if mask is not None:
             with mrcfile.open(mask,'r') as mrc:
                 mask = mrc.data
-            input_map = input_map * mask
+            input_map_masked = input_map * mask
+        else:
+            input_map_masked = input_map
 
         limit_r_low = int(voxel_size * nz / low_res)
         limit_r_high = int(voxel_size * nz / high_res)
 
         # power spectrum
-        f1 = fftshift(fftn(input_map))
+        f1 = fftshift(fftn(input_map_masked))
         ret = (np.real(np.multiply(f1,np.conj(f1)))**0.5).astype(np.float32)
 
         #vet whitening filter
@@ -329,7 +331,9 @@ class ISONET:
         nz = low_data.shape[0]
         rad = nz*voxel_size/limit_res
         F_map = get_sphere(rad,nz)
-
+        # with mrcfile.new("sphere.mrc",overwrite=True) as mrc:
+        #     mrc.set_data(F_map.astype(np.float32))
+        #     mrc.voxel_size = voxel_size
         high_data_low = apply_F_filter(high_data,F_map)
         out_low = apply_F_filter(low_data,F_map)
 
@@ -409,16 +413,134 @@ class ISONET:
 
         logging.info("calculating fast 3DFSC, this will take few minutes")
         fsc3d = ThreeD_FSC(FSC_map, limit_r,angle=float(cone_sampling_angle), n_processes=ncpus)
-
+        # from spIsoNet.util.FSC import get_sphere
+        # fsc3d = np.maximum(1-get_sphere(limit_r-2,fsc3d.shape[0]),fsc3d)
         with mrcfile.new(o, overwrite=True) as mrc:
             mrc.set_data(fsc3d.astype(np.float32))
         logging.info("voxel_size {}".format(voxel_size))
 
 
          
+    def fsd3d(self, 
+                   star_file: str, 
+                   map_dim: int,
+                   apix: float=1.0,
+                   o: str="FSD3D.mrc",
+                   low_res: float=100,
+                   high_res: float=1, 
+                   number_subset: float=10000,
+                   grid_size: float=64,
+                   sym: str = "c1"
+                   ):
+
+        """
+        \nFourier shell density, reimpliment from cryoEF, relies on relion star file and also relion installation.\n
+        spisonet.py map_refine half1.mrc half2.mrc mask.mrc [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
+        :param h: Input name of half1
+        :param h2: Input name of half2
+        :param mask: Filename of a user-provided mask
+        :param ncpus: Number of cpu.
+        :param limit_res: The resolution limit for recovery, default is the resolution of the map.
+        :param fsc_file: 3DFSC file if not set, isonet will generate one.
+        :param cone_sampling_angle: Angle for 3D fsc sampling for spIsoNet generated 3DFSC. spIsoNet default is 10 degrees, the default for official 3DFSC is 20 degrees.
+        """
+        logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
+            ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])   
+        import numpy as np
+        import mrcfile
+        from subprocess import check_output
+
+        s = f"thetacol=`grep _rlnAngleTilt {star_file} | awk '{{print $2}}' | sed 's/#//'`;\
+        phicol=`grep _rlnAngleRot {star_file} | awk '{{print $2}}' | sed 's/#//'`;\
+        cat {star_file} | grep @ | awk -v thetacolvar=${{thetacol}} -v phicolvar=${{phicol}} '{{if (NF>2) print $thetacolvar, $phicolvar}}' > theta_phi_angles.dat"
+        check_output(s, shell=True)
+
+        coordinates = np.loadtxt("theta_phi_angles.dat",dtype=np.float32)
+        index = np.random.choice(coordinates.shape[0], number_subset)#, replace=True)
+        coordinates = coordinates[index]
+
+        def generate_grid(coordinates, grid_size):
+            # Create a 3D grid for calculation
+            x = np.linspace(-1, 1, grid_size).astype(np.float32)
+            y = np.linspace(-1, 1, grid_size).astype(np.float32)
+            z = np.linspace(-1, 1, grid_size).astype(np.float32)
+            x, y, z = np.meshgrid(x, y, z)
+
+            # Initialize the matrix to store the sum of circles
+            circle_matrix = np.zeros_like(x)
+
+            # Define the distance threshold
+            threshold = 5**0.5/grid_size
+            coord = np.radians(coordinates)
+            cos_coord = np.cos(coord)
+            sin_coord = np.sin(coord)
+
+            # This need to think carefully
+            surface_points = np.stack([sin_coord[:,0]*cos_coord[:,1],sin_coord[:,0]*sin_coord[:,1],cos_coord[:,0]])
+            #surface_points = np.stack([cos_coord[:,0],sin_coord[:,0]*sin_coord[:,1],sin_coord[:,0]*cos_coord[:,1]])
+            #print(surface_points)
+            pixels = np.column_stack([x.flatten(), y.flatten(), z.flatten()])
+
+            distances = np.abs(np.matmul(pixels,surface_points))
+            circle = np.where(distances <= threshold, 1, 0)
+            circle = np.sum(circle, axis=1)
+            circle_matrix =  circle.reshape(grid_size, grid_size, grid_size)
+            circle_matrix =  np.transpose(circle_matrix,[2,0,1])
+            return circle_matrix
+        
+        out_mat = generate_grid(coordinates[:1000],grid_size)
+        for i in range(1,10):
+            out_mat += generate_grid(coordinates[i*1000:(i+1)*1000],grid_size)
+        out_mat = out_mat / number_subset
+
+        with mrcfile.new(o, overwrite=True) as mrc:
+            mrc.set_data(out_mat.astype(np.float32))
+
+        s = f"relion_image_handler --i {o} --o {o} --sym {sym}"
+        check_output(s,shell=True)
+
+        with mrcfile.open(o,'r') as mrc:
+            input_map = mrc.data
+            nz,ny,nx = input_map.shape
+            voxel_size = mrc.voxel_size.x
+            if voxel_size == 0:
+                voxel_size = 1
+
+        #apix_small = apix * map_dim / grid_size
+        r = np.arange(nz)-nz//2
+        limit_r_low = int(apix * nz / low_res)
+        limit_r_high = int(apix * nz / high_res)
 
 
+        [Z,Y,X] = np.meshgrid(r,r,r)
+        index = np.round(np.sqrt(Z**2+Y**2+X**2))
 
+        F_map = np.zeros_like(input_map)
+        eps = 1e-4
+
+        for i in range(nz//2):
+            if i > limit_r_low:
+                if i < limit_r_high:
+                    F_map[index==i] = 1.01/np.max(input_map[index==i])
+                else:
+                    F_map[index==i] = 0
+            else:
+                F_map[index==i] = 1
+
+        out_map = F_map*input_map
+        for i in range(nz//2):
+            if i > limit_r_low:
+                if i > limit_r_high:
+                    out_map[index==i] = 0
+            else:
+                out_map[index==i] = 1
+
+        out_map[out_map>1] = 1
+        import skimage
+        out_map = skimage.transform.resize(out_map, [map_dim,map_dim,map_dim])
+        with mrcfile.new(o, overwrite=True) as mrc:
+            mrc.set_data(out_map)
+            mrc.voxel_size = voxel_size
 
 
     '''

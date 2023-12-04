@@ -8,6 +8,20 @@ from multiprocessing import Pool
 import numpy as np
 from scipy.spatial import cKDTree
 from skimage.transform import resize
+
+def calculate_resolution(half1_file, half2_file, mask_file=None, voxel_size=1, threshold=0.143):
+    with mrcfile.open(half1_file) as mrc:
+        h1 = mrc.data
+    with mrcfile.open(half2_file) as mrc:
+        h2 = mrc.data  
+    if mask_file is not None:
+        with mrcfile.open(mask_file) as mrc:
+            mask = mrc.data  
+    else:
+        mask = np.ones_like(h1)
+    fsc_map = get_FSC_map([h1,h2],mask)
+    return recommended_resolution(fsc_map, voxel_size, threshold = threshold)
+
 def recommended_resolution(fsc3d, voxel_size, threshold = 0.5):
     diameter = fsc3d.shape[0]
     center = diameter//2
@@ -23,19 +37,19 @@ def recommended_resolution(fsc3d, voxel_size, threshold = 0.5):
     return 2 * voxel_size
 
 
-def get_sphere(rad,dim):
+def get_sphere(rad,dim,smooth_pixels=3):
     F_map = np.zeros([dim,dim,dim], dtype = np.float32)
 
     r = np.arange(dim)-dim//2
 
     [Z,Y,X] = np.meshgrid(r,r,r)
     index = np.round(np.sqrt(Z**2+Y**2+X**2))
-
+    
     for i in range(dim//2):
-        if i < rad-1:
+        if i < rad-smooth_pixels:
             F_map[index==i] = 1
-        elif i == rad:
-            F_map[index==i] = 0.5
+        if i >= rad-smooth_pixels and i < rad:
+            F_map[index==i] = (rad-i)/(1.0*(smooth_pixels+1))
 
     return F_map
 
@@ -46,6 +60,16 @@ def apply_F_filter(input_map,F_map):
     out =  np.real(out).astype(np.float32)
     return out
 
+def match_spectrum(input_map,F_map):
+    #problematic
+    h1 = input_map
+    f1 = fftshift(fftn(h1))
+    n1 = np.real(np.multiply(f1,np.conj(f1)))
+    nf1 = f1/np.sqrt(n1*n1)
+
+    out = ifftn(nf1*fftshift(F_map))
+    out =  np.real(out).astype(np.float32)
+    return out
 
 
 def get_rayFSC(data, limit_r, n_sampling= 3, preserve_prec = 50):

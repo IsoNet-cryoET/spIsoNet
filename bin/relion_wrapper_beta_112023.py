@@ -145,7 +145,7 @@ def parse_filename(star):
     return dir, basename, half_str, var, beforeVar
 
 if __name__=="__main__":  
-
+    print("112023")
     dir, basename, half_str, var, beforeVar = parse_filename(sys.argv[1])
    
     import torch
@@ -154,7 +154,7 @@ if __name__=="__main__":
 
     gpu = parse_env("CUDA_VISIBLE_DEVICES", "string", gpu_list)
     CONDA_ENV = parse_env("CONDA_ENV", "string", None)
-    whitening = parse_env("ISONET_WHITENING", "bool", False)
+    whitening = parse_env("ISONET_WHITENING", "bool", True)
     whitening_low = parse_env("ISONET_WHITENING_LOW", "float", 10)
     retrain = parse_env("ISONET_RETRAIN_EACH_ITER", "bool", False)
     beta = parse_env("ISONET_BETA", "float", 0.5)
@@ -173,7 +173,8 @@ if __name__=="__main__":
             if '--combine' in li:
                 combine = True
                 break
-    print("combine:",combine)            
+    print("combine:",combine)       
+
     # healpix
     with open("%s/%s_it%s_sampling.star" %(dir,basename,beforeVar)) as file:
         for li in file.readlines():
@@ -250,7 +251,6 @@ if __name__=="__main__":
         mrc_initial = '%s/%s_it000_%s_class001.mrc' %(dir,basename,half_str)
         mrc_unfil = '%s/%s_it%s_%s_class001_unfil.mrc' %(dir,basename,var,half_str)
         mrc_unfil_backup = '%s/%s_it%s_%s_class001_unfil_backup.mrc' %(dir,basename,var,half_str)
-        mrc_lowpass_backup = '%s/%s_it%s_%s_class001_unfil_lowpass_backup.mrc' %(dir,basename,var,half_str)
         mrc_whiten_backup = '%s/%s_it%s_%s_class001_unfil_whiten_backup.mrc' %(dir,basename,var,half_str)
         mrc_combine_backup = '%s/%s_it%s_%s_class001_unfil_combine_backup.mrc' %(dir,basename,var,half_str)
         mrc_overwrite = '%s/%s_it%s_%s_class001_external_reconstruct.mrc' %(dir,basename,var,half_str)
@@ -270,23 +270,30 @@ if __name__=="__main__":
             execute_combine(mrc_initial,mrc_unfil,mrc_unfil,resolution_initial) 
             shutil.copy(mrc_unfil, mrc_combine_backup)
             shutil.copy(mrc_unfil, mrc_overwrite)
-        print(f'here {lowpass}')
-        if lowpass and limit_resolution < resolution_initial:
-            print(mrc_unfil)
-            print(limit_resolution)
-            #with mrcfile.open(fscn, 'r') as mrc:
-            #    fsc = mrc.data
-            #from spIsoNet.util.FSC import recommended_resolution
-            #res = recommended_resolution(fsc, sampling, 0.143)
-            #print(f"3DFSC resolution {res}")
-            from subprocess import check_output
-            s = f"relion_image_handler --i {mrc_unfil} --o {mrc_lowpass_backup} --lowpass {limit_resolution}; mv {mrc_lowpass_backup} {mrc_unfil}"
-            check_output(s, shell=True)
-            shutil.copy(mrc_unfil, mrc_overwrite) 
 
-        print("sync {}".format(half_str))
+        sync1 = '%s/%s_it%s_class001_external_reconstruct.sync1' %(dir,basename,var)
+        isonet_done = '%s/%s_it%s_class001_external_reconstruct.done' %(dir,basename,var)
 
-        if (healpix >= limit_healpix) and (limit_resolution < 10) and (half_str == 'half1'):
+        if (healpix >= limit_healpix) and (limit_resolution < 10) and (half_str == 'half2'):
+            with open(sync1, 'w') as f:
+                f.write("spisonet whitening and combining")
+
+            time.sleep(30)
+            for i in range (1,10000):
+                try:
+                    with open(isonet_done, 'r') as f2:
+                        break
+                except:
+                    #print("Waiting")
+                    time.sleep(30)
+        elif (healpix >= limit_healpix) and (limit_resolution < 10) and (half_str == 'half1'):
+            for i in range (1,10000):
+                try:
+                    with open(sync1, 'r') as f:
+                        break
+                except:
+                    time.sleep(10)
+            
 
             mrc1_overwrite = '%s/%s_it%s_half1_class001_external_reconstruct.mrc' %(dir,basename,var)
             mrc2_overwrite = '%s/%s_it%s_half2_class001_external_reconstruct.mrc' %(dir,basename,var)
@@ -294,17 +301,33 @@ if __name__=="__main__":
             mrc2_unfil = '%s/%s_it%s_half2_class001_unfil.mrc' %(dir,basename,var)
             mrc1_cor = '%s/corrected_%s_it%s_half1_class001_unfil.mrc' %(dir,basename,var)
             mrc2_cor = '%s/corrected_%s_it%s_half2_class001_unfil.mrc' %(dir,basename,var)
+            mrc1_lowpass_backup = '%s/%s_it%s_half1_class001_unfil_lowpass_backup.mrc' %(dir,basename,var)
+            mrc2_lowpass_backup = '%s/%s_it%s_half2_class001_unfil_lowpass_backup.mrc' %(dir,basename,var)
+            fscn='%s/%s_it%s_3DFSC.mrc' %(dir,basename,var)    
 
-            time.sleep(30)
-            for i in range (1,15):
-                try:
-                    with mrcfile.open(mrc2_unfil) as f2:
-                        break
-                    with mrcfile.open(mrc2_overwrite) as f2:
-                        break
-                except:
-                    print("Waiting for half2")
-                    time.sleep(10)
+            # execute 3dfsc
+            execute_3dfsc(mrc1_unfil,mrc2_unfil,fscn, limit_res=None, mask_file=mask_file)    
+            print(f"using FSC3D file {fscn}")
+
+            if lowpass:
+                with mrcfile.open(fscn, 'r') as mrc:
+                   fsc = mrc.data
+                from spIsoNet.util.FSC import recommended_resolution
+                res_3dfsc = recommended_resolution(fsc, sampling, 0.143)
+
+                print(f"3DFSC resolution {res_3dfsc}")
+                from subprocess import check_output
+                s = f"relion_image_handler --i {mrc1_unfil} --o {mrc1_lowpass_backup} --lowpass {res_3dfsc} --filter_edge_width 3 ; \
+                    cp {mrc1_lowpass_backup} {mrc1_unfil}"
+                print(s)
+                check_output(s, shell=True)
+                
+                s = f"relion_image_handler --i {mrc2_unfil} --o {mrc2_lowpass_backup} --lowpass {res_3dfsc} --filter_edge_width 3 ; \
+                    cp {mrc2_lowpass_backup} {mrc2_unfil}"
+                print(s)
+                check_output(s, shell=True)
+                shutil.copy(mrc1_unfil, mrc1_overwrite) 
+                shutil.copy(mrc2_unfil, mrc2_overwrite) 
 
             #Force write pixelsize
             with mrcfile.open(mrc1_unfil) as f1:
@@ -324,11 +347,6 @@ if __name__=="__main__":
             mean2_before =  emMap2.mean()  
             std1_before =  emMap1.std()                  
             std2_before =  emMap2.std()  
-
-            # execute 3dfsc
-            fscn='%s/%s_it%s_3DFSC.mrc' %(dir,basename,var)    
-            execute_3dfsc(mrc1_unfil,mrc2_unfil,fscn, limit_res=limit_resolution, mask_file=mask_file)    
-            print(f"using FSC3D file {fscn}")
         
             # looking for pretrained model
             model = '%s/%s_it%s_half_class001_unfil.pt' %(dir,basename,beforeVar)
@@ -380,26 +398,16 @@ if __name__=="__main__":
                 #res = recommended_resolution(fsc, sampling, 0.143)
                 #print(f"3DFSC resolution {res}")
                 from subprocess import check_output
-                s = f"relion_image_handler --i {mrc1_overwrite} --o tmp.mrc --lowpass {limit_resolution}; mv tmp.mrc {mrc1_overwrite}"
+                s = f"relion_image_handler --i {mrc1_overwrite} --o tmp.mrc --lowpass {res_3dfsc}; mv tmp.mrc {mrc1_overwrite}"
                 check_output(s, shell=True)
-                s = f"relion_image_handler --i {mrc2_overwrite} --o tmp.mrc --lowpass {limit_resolution}; mv tmp.mrc {mrc2_overwrite}"
+                s = f"relion_image_handler --i {mrc2_overwrite} --o tmp.mrc --lowpass {res_3dfsc}; mv tmp.mrc {mrc2_overwrite}"
                 check_output(s, shell=True)
 
-            isonet_done = '%s/%s_it%s_class001_external_reconstruct.done' %(dir,basename,var)
             with open(isonet_done, 'w') as f:
                 f.write("spisonet finished for this iteration")
 
             print("finished spisonet reconstruction")
-        if (healpix >= limit_healpix) and (limit_resolution < 10) and (half_str == 'half2'):
-            isonet_done = '%s/%s_it%s_class001_external_reconstruct.done' %(dir,basename,var)
-            time.sleep(30)
-            for i in range (1,10000):
-                try:
-                    with open(isonet_done, 'r') as f2:
-                        break
-                except:
-                    #print("Waiting")
-                    time.sleep(30)
+
 
         
             

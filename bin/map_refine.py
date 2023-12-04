@@ -279,7 +279,7 @@ def map_refine(halfmap, mask, fsc3d, alpha, voxel_size, epochs = 10, mixed_preci
 
 def map_refine_n2n(halfmap1, halfmap2, mask, fsc3d, alpha, beta, voxel_size, epochs = 10, mixed_precision = False,
                output_dir = "results", output_base1="half1", output_base2="half2", n_subvolume = 50, pretrained_model=None,
-               cube_size = 64, predict_crop_size=96, batch_size = 8, acc_batches=2, gpuID="0", learning_rate= 4e-4):
+               cube_size = 64, predict_crop_size=96, batch_size = 8, acc_batches=2, gpuID="0", learning_rate= 4e-4, debug_mode=False):
 
     data_dir_1 = output_dir+"/"+output_base1+"_data"
     data_dir_2 = output_dir+"/"+output_base2+"_data"
@@ -315,7 +315,7 @@ def map_refine_n2n(halfmap1, halfmap2, mask, fsc3d, alpha, beta, voxel_size, epo
     if pretrained_model is not None:
         print(f"loading previous model {pretrained_model}")
         network.load(pretrained_model)
-    debug_mode = False
+    #debug_mode = False
     if epochs > 0:
         if debug_mode:
             for i in range(epochs):
