@@ -137,6 +137,10 @@ class ISONET:
                    ncpus: int=16, 
                    output_dir: str="isonet_maps",
                    pretrained_model: str=None,
+                   limit_res: str="None",
+
+                   ref_map: str="None",
+                   ref_resolution: float=10,
 
                    epochs: int=50,
                    n_subvolume: int=1000, 
@@ -236,11 +240,28 @@ class ISONET:
             with mrcfile.open(aniso_file, 'r') as mrc:
                 fsc3d = mrc.data
 
+        if limit_res in ["None", None]:
+            #from spIsoNet.util.FSC import recommended_resolution
+            limit_res = None #recommended_resolution(fsc3d, voxel_size, threshold = 0.143)
+        else:
+            limit_res = float(limit_res)
+
+        if ref_map not in ['None',None]:
+            logging.info(f"Incoorporating low resolution information of the reference {ref_map}\n\
+                         until the --ref_resolution {ref_resolution}")
+            from spIsoNet.util.FSC import combine_map_F
+            halfmap1 = combine_map_F(ref_map,halfmap1,ref_resolution,voxel_size,mask_data=mask)
+            halfmap2 = combine_map_F(ref_map,halfmap2,ref_resolution,voxel_size,mask_data=mask)
+            
         map_refine_n2n(halfmap1,halfmap2, mask_vol, fsc3d, alpha = alpha,beta=beta,  voxel_size=voxel_size, output_dir=output_dir, 
                    output_base1=output_base1, output_base2=output_base2, mixed_precision=mixed_precision, epochs = epochs,
                    n_subvolume=n_subvolume, cube_size=cube_size, pretrained_model=pretrained_model,
-                   batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size,gpuID=gpuID, learning_rate=learning_rate)
-        
+                   batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size,gpuID=gpuID, learning_rate=learning_rate, limit_res= limit_res)
+        if limit_res is not None:
+            logging.info("combining")
+            self.combine_map(f"{output_dir}/corrected_{output_base1}_filtered.mrc",h1, out_map=f"{output_dir}/corrected_{output_base1}.mrc",limit_res=limit_res,mask_file= mask)
+            self.combine_map(f"{output_dir}/corrected_{output_base2}_filtered.mrc",h2, out_map=f"{output_dir}/corrected_{output_base2}.mrc",limit_res=limit_res,mask_file= mask)
+
         logging.info("Finished")
 
     def whitening(self, 
@@ -313,7 +334,8 @@ class ISONET:
                     low_map: str, 
                     high_map: str, 
                     out_map:str,
-                    limit_res: float):
+                    threshold_res: float,
+                    mask_file: str=None):
         import numpy as np
         import mrcfile
         with mrcfile.open(low_map,'r') as mrc:
@@ -321,28 +343,17 @@ class ISONET:
             voxel_size = mrc.voxel_size.x
             if voxel_size == 0:
                 voxel_size = 1
-            logging.info("voxel_size",voxel_size)
+            logging.info(f"voxel_size {voxel_size}")
 
         with mrcfile.open(high_map,'r') as mrc:
             high_data = mrc.data
 
-        from spIsoNet.util.FSC import get_sphere,apply_F_filter
+        with mrcfile.open(mask_file,'r') as mrc:
+            mask = mrc.data
+    
+        from spIsoNet.util.FSC import combine_map_F
+        out_data = combine_map_F(low_data, high_data, threshold_res, voxel_size, mask_data=mask)
 
-        nz = low_data.shape[0]
-        rad = nz*voxel_size/limit_res
-        F_map = get_sphere(rad,nz)
-        # with mrcfile.new("sphere.mrc",overwrite=True) as mrc:
-        #     mrc.set_data(F_map.astype(np.float32))
-        #     mrc.voxel_size = voxel_size
-        high_data_low = apply_F_filter(high_data,F_map)
-        out_low = apply_F_filter(low_data,F_map)
-
-        out_low = (out_low-out_low.mean())/out_low.std()*high_data_low.std() + high_data_low.mean()
-
-        out_high = apply_F_filter(high_data,1-F_map)
-
-        out_data = out_low + out_high
-        out_data = (out_data-out_data.mean())/out_data.std()*high_data.std() + high_data.mean()
         with mrcfile.new(out_map,overwrite=True) as mrc:
             mrc.set_data(out_data)
             mrc.voxel_size = voxel_size
@@ -357,6 +368,7 @@ class ISONET:
                    ncpus: int=16, 
                    limit_res: float=None, 
                    cone_sampling_angle: float=10,
+                   keep_highres: bool = False
                    ):
 
         """
@@ -413,13 +425,14 @@ class ISONET:
 
         logging.info("calculating fast 3DFSC, this will take few minutes")
         fsc3d = ThreeD_FSC(FSC_map, limit_r,angle=float(cone_sampling_angle), n_processes=ncpus)
-        # from spIsoNet.util.FSC import get_sphere
-        # fsc3d = np.maximum(1-get_sphere(limit_r-2,fsc3d.shape[0]),fsc3d)
+        if keep_highres:
+            from spIsoNet.util.FSC import get_sphere
+            fsc3d = np.maximum(1-get_sphere(limit_r-2,fsc3d.shape[0]),fsc3d)
         with mrcfile.new(o, overwrite=True) as mrc:
             mrc.set_data(fsc3d.astype(np.float32))
         logging.info("voxel_size {}".format(voxel_size))
 
-
+         
          
     def fsd3d(self, 
                    star_file: str, 
@@ -521,7 +534,7 @@ class ISONET:
         for i in range(nz//2):
             if i > limit_r_low:
                 if i < limit_r_high:
-                    F_map[index==i] = 1.01/np.max(input_map[index==i])
+                    F_map[index==i] = 1.1/np.max(input_map[index==i])
                 else:
                     F_map[index==i] = 0
             else:
@@ -542,6 +555,76 @@ class ISONET:
             mrc.set_data(out_map)
             mrc.voxel_size = voxel_size
 
+
+    def angular_whiten(self, in_name,out_name,resolution_initial, limit_resolution):
+        import mrcfile
+        from numpy.fft import fftn,fftshift,ifftn
+        from spIsoNet.util.FSC import apply_F_filter
+        import numpy as np
+        import skimage
+
+
+        with mrcfile.open(in_name) as mrc:
+            in_map = mrc.data.copy()
+            voxel_size = mrc.voxel_size.x
+
+        F_map = fftn(in_map)
+        shifted_F_map = fftshift(F_map)
+        F_power = np.real(np.multiply(shifted_F_map,np.conj(shifted_F_map)))**0.5
+        F_power = F_power.astype(np.float32)
+        nz = 64
+        downsampled_F_map = skimage.transform.resize(F_power, [nz,nz,nz])
+
+        low_r = nz * voxel_size / resolution_initial
+        high_r = nz * voxel_size / limit_resolution
+        print(low_r)
+        print(high_r)
+
+        x, y, z = np.meshgrid(np.arange(nz), np.arange(nz), np.arange(nz))
+
+        direction_vectors = np.stack([x - nz // 2, y - nz // 2, z - nz // 2], axis=-1)
+        direction_vectors = direction_vectors.reshape((nz**3,3))
+
+        d = np.linalg.norm(direction_vectors, axis=-1)
+        condition = np.logical_and((d > low_r), (d < high_r))
+
+        distances = d[condition]
+        direction_vectors = direction_vectors[condition]
+
+        normalized_vectors = direction_vectors / distances[:,np.newaxis]
+        normalized_vectors = normalized_vectors.astype(np.float32)
+        normalized_matrix = np.matmul(normalized_vectors, np.transpose(normalized_vectors))
+
+        half_angle_rad = np.radians(5)
+        half_angle_cos = np.cos(half_angle_rad)
+        normalized_matrix = (np.abs(normalized_matrix) > half_angle_cos).astype(np.float32)
+
+        sum_matrix = np.sum(normalized_matrix, axis = -1)
+
+        input_flatterned_matrix = downsampled_F_map.reshape((nz**3,1))[condition]
+
+        out_values = np.matmul(normalized_matrix, input_flatterned_matrix).squeeze()/sum_matrix
+
+        out_matrix = np.zeros((nz**3,), dtype = np.float32)
+        out_matrix[condition] = 1/out_values
+        #out_matrix[d<=low_r] = np.max(out_matrix[d<=(low_r+1)])
+        out_matrix = out_matrix.reshape((nz,nz,nz))
+        # with mrcfile.new("tmp.mrc", overwrite=True) as mrc:
+        #     mrc.set_data(out_matrix.astype(np.float32))
+        map_dim = in_map.shape[0]
+        out_matrix = skimage.transform.resize(out_matrix, [map_dim,map_dim,map_dim])
+
+        # with mrcfile.new("tmp.mrc", overwrite=True) as mrc:
+        #     mrc.set_data(out_matrix.astype(np.float32))
+
+        transformed_data = np.real(ifftn(F_map*fftshift(out_matrix))).astype(np.float32)
+        transformed_data =  (transformed_data-np.mean(transformed_data))/np.std(transformed_data)
+        transformed_data =   transformed_data*np.std(in_map) + np.mean(in_map)
+        reverse_filter = (out_matrix<0.0000001).astype(int)
+        in_map_filtered = apply_F_filter(in_map,reverse_filter)
+        with mrcfile.new(out_name, overwrite=True) as mrc:
+            mrc.set_data((transformed_data+in_map_filtered).astype(np.float32))
+            mrc.voxel_size = tuple([voxel_size]*3) 
 
     '''
     def map_refine_multi(self, half1_file, half2_file, mask_file, fsc_file, limit_res, output_dir="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, weighting=False):

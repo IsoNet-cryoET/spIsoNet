@@ -279,7 +279,7 @@ def map_refine(halfmap, mask, fsc3d, alpha, voxel_size, epochs = 10, mixed_preci
 
 def map_refine_n2n(halfmap1, halfmap2, mask, fsc3d, alpha, beta, voxel_size, epochs = 10, mixed_precision = False,
                output_dir = "results", output_base1="half1", output_base2="half2", n_subvolume = 50, pretrained_model=None,
-               cube_size = 64, predict_crop_size=96, batch_size = 8, acc_batches=2, gpuID="0", learning_rate= 4e-4, debug_mode=False):
+               cube_size = 64, predict_crop_size=96, batch_size = 8, acc_batches=2, gpuID="0", learning_rate= 4e-4, debug_mode=False, limit_res=None):
 
     data_dir_1 = output_dir+"/"+output_base1+"_data"
     data_dir_2 = output_dir+"/"+output_base2+"_data"
@@ -294,6 +294,16 @@ def map_refine_n2n(halfmap1, halfmap2, mask, fsc3d, alpha, beta, voxel_size, epo
 
     # from spIsoNet.util.FSC import get_rayFSC
     #fsc3d_cube = rescale_fsc(fsc3d, threshold, crop_size)
+    if limit_res is not None:
+        from spIsoNet.util.FSC import lowpass
+        logging.info(f"spIsoNet correction until resolution {limit_res}A!\n\
+                     Information beyond {limit_res}A remains unchanged")
+        halfmap1 = lowpass(halfmap1, limit_res, voxel_size)
+        halfmap2 = lowpass(halfmap2, limit_res, voxel_size)
+    else:
+        logging.info(f"Does not limit resolution for spIsoNet correction!\
+                     Please consider limit correction resolution use --limit_res to have better performance")
+
     fsc3d_cube_small = rescale_fsc(fsc3d, cube_size)
 
     halfmap1 = normalize(halfmap1,percentile=False)
@@ -344,10 +354,10 @@ def map_refine_n2n(halfmap1, halfmap2, mask, fsc3d, alpha, beta, voxel_size, epo
     out_map2 = network.predict_map(halfmap2, output_dir=output_dir, cube_size = cube_size, crop_size=predict_crop_size, output_base=output_base2)
 
 
-    with mrcfile.new(f"{output_dir}/corrected_{output_base1}.mrc", overwrite=True) as output_mrc:
+    with mrcfile.new(f"{output_dir}/corrected_{output_base1}_filtered.mrc", overwrite=True) as output_mrc:
         output_mrc.set_data(out_map1.astype(np.float32))
         output_mrc.voxel_size = voxel_size
-    with mrcfile.new(f"{output_dir}/corrected_{output_base2}.mrc", overwrite=True) as output_mrc:
+    with mrcfile.new(f"{output_dir}/corrected_{output_base2}_filtered.mrc", overwrite=True) as output_mrc:
         output_mrc.set_data(out_map2.astype(np.float32))
         output_mrc.voxel_size = voxel_size
 

@@ -19,8 +19,9 @@ import time
 import numpy as np
 import mrcfile
 import shutil
-from subprocess import check_output
 
+# import fcntl
+# import errno
 
 #for isonet 
 '''
@@ -37,8 +38,9 @@ def execute_deep(mrc1, mrc2, fsc3d, dir, gpu, epochs = 1, mask_file = None, pret
     #data_file =  ' %s/%s_it%s_half%s_class001_external_reconstruct.mrc' %(dir, basename, var, half)   
     params = ' eval "$(conda shell.bash hook)" && conda activate %s && ' %CONDA_ENV     
     params += ' spisonet.py refine_n2n '
-    params += f" {mrc1} {mrc2}"      
-    params += ' %s' %(fsc3d) 
+    params += f" {mrc1} {mrc2}"     
+    if  fsc3d is not None:
+        params += ' %s' %(fsc3d) 
     params += ' --epochs %s --n_subvolume 1000'   %(epochs)
     if acc_batches is not None:
         params += ' --acc_batches %s'   %(acc_batches) 
@@ -48,6 +50,29 @@ def execute_deep(mrc1, mrc2, fsc3d, dir, gpu, epochs = 1, mask_file = None, pret
         params += ' --alpha %s'   %(alpha) 
     if beta is not None:
         params += ' --beta %s'   %(beta) 
+    params += ' --output_dir %s' %(dir) 
+    params += ' --gpuID %s' %(gpu) 
+    if pretrained_model is not None:
+        params += ' --pretrained_model %s' %(pretrained_model)
+    if mask_file is not None:
+        params += ' --mask %s' %(mask_file)
+
+    print(params)
+    os.system(params)
+
+def execute_deep_seperate(mrc1,  fsc3d, dir, gpu, epochs = 1, mask_file = None, pretrained_model=None, alpha = None, acc_batches= None, batch_size = None): 
+    #data_file =  ' %s/%s_it%s_half%s_class001_external_reconstruct.mrc' %(dir, basename, var, half)   
+    params = ' eval "$(conda shell.bash hook)" && conda activate %s && ' %CONDA_ENV     
+    params += ' spisonet.py refine '
+    params += f" {mrc1} "      
+    params += ' %s' %(fsc3d) 
+    params += ' --epochs %s --n_subvolume 1000'   %(epochs)
+    if acc_batches is not None:
+        params += ' --acc_batches %s'   %(acc_batches) 
+    if batch_size is not None:
+        params += ' --batch_size %s'   %(batch_size) 
+    if alpha is not None:
+        params += ' --alpha %s'   %(alpha) 
     params += ' --output_dir %s' %(dir) 
     params += ' --gpuID %s' %(gpu) 
     if pretrained_model is not None:
@@ -71,15 +96,13 @@ def execute_3dfsc(fn1,fn2,fscn,limit_res=None, mask_file=None):
 #     params += ' -p wideTarget' 
     os.system(params)
 
-def execute_whitening(fn1,fscn,mask,high_res,low_res=10): 
+def execute_whitening(fn1,fscn,high_res,low_res=10): 
     params = ' eval "$(conda shell.bash hook)" && conda activate %s && ' %CONDA_ENV     
     params += ' spisonet.py whitening '
     params += ' %s' %(fn1)  
     params += ' -o %s' %(fscn)
-    params += ' --mask %s' %(mask)
     params += ' --high_res %s'%(high_res)
     params += ' --low_res %s'%(low_res)
-    print(params)
     os.system(params)
 
 def execute_combine(f1,f2,f3,limit_res=20): 
@@ -104,24 +127,25 @@ def parse_env(ENV_STRING, val_type, default):
             val = default
 
     elif val_type == 'int':
-        if val is None or len(val) == 0:
+        if val is None:
             val = default
         else:
             val = int(val)
 
     elif val_type == 'float':
-        if val is None or len(val) == 0:
+        if val is None:
             val = default
         else:
             val = float(val)
     
     elif val_type == 'str':
-        if val is None or len(val) == 0:
+        if val is None:
             print(f"{val} is None")
             val = default
     
     print(f"set {ENV_STRING}={val}")
     return val
+
 
 def parse_filename(star):
     dir=os.path.dirname(star)
@@ -145,24 +169,8 @@ def parse_filename(star):
         beforeVar = '0%d' %(iter_number-1)
     return dir, basename, half_str, var, beforeVar
 
-def wait_until_file(sync_file,interval_time=10,total_time=10000):
-    time.sleep(interval_time)
-    for i in range (1,total_time):
-        try:
-            with open(sync_file, 'r') as f:
-                result =  f.read()
-            s = f'rm {sync_file}'
-            check_output(s, shell=True)
-            return result
-        except:
-            time.sleep(interval_time)
-
-def write_to_file(file_name, words='This is a temperal file to synchronize half 1 and 2 for isonet'):
-    with open(file_name, 'w') as f:
-        f.write(words)
-
 if __name__=="__main__":  
-    print("112023")
+
     dir, basename, half_str, var, beforeVar = parse_filename(sys.argv[1])
    
     import torch
@@ -181,16 +189,17 @@ if __name__=="__main__":
     acc_batches = parse_env("ISONET_ACC_BATCHES", "int", 2)
     epochs = parse_env("ISONET_EPOCHS", "int", 5)
     start_epochs = parse_env("ISONET_START_EPOCHS", "int", 5)
+    lowres_end_healpix = parse_env("ISONET_LOWRES_END_HEALPIX", "int", 10)
     combine = parse_env("ISONET_COMBINE", "bool", False)
     lowpass = parse_env("ISONET_LOWPASS", "bool", True)
 
-    # resolution_initial
+    # combine
     with open("%s/%s_it000_optimiser.star" %(dir,basename)) as file:
         for line_number,li in enumerate(file.readlines()):
             if '--combine' in li:
                 combine = True
                 break
-    print("combine:",combine)       
+    print("combine:",combine)    
 
     # healpix
     with open("%s/%s_it%s_sampling.star" %(dir,basename,beforeVar)) as file:
@@ -208,9 +217,9 @@ if __name__=="__main__":
                 mask_file = li.split()[1]
                 print("mask_file = %s" %mask_file)
                 break
-        sampling_index = None
 
-    # sampling(pixelsize)        
+    # sampling(pixelsize)  
+    sampling_index = None    
     with open("%s/%s_it%s_data.star" %(dir,basename,beforeVar)) as f:
         for line in f.readlines():
             if "_rlnImagePixelSize" in line:
@@ -218,6 +227,15 @@ if __name__=="__main__":
             if "opticsGroup1" in line:
                 sampling = float(line.split()[sampling_index-1])
                 print("pixel size = %s" %sampling) 
+
+    # resolution_initial
+    with open("%s/%s_it000_optimiser.star" %(dir,basename)) as file:
+        for line_number,li in enumerate(file.readlines()):
+            if 'ini_high' in li:
+                li_sp = li.split()
+                index_ini = li_sp.index("--ini_high")
+                resolution_initial = float(li_sp[index_ini+1])
+                break    
 
     # limit_resolution: last iter resolution at 0.143
     limit_resolution = 2*sampling
@@ -239,18 +257,11 @@ if __name__=="__main__":
                     if float(line_split[FSC_index-1])<= 0.143:
                         limit_resolution = float(line_split[Aresolution_index-1])
                         break
-
-    # resolution_initial
-    with open("%s/%s_it000_optimiser.star" %(dir,basename)) as file:
-        for line_number,li in enumerate(file.readlines()):
-            if 'ini_high' in li:
-                li_sp = li.split()
-                index_ini = li_sp.index("--ini_high")
-                resolution_initial = float(li_sp[index_ini+1])
-                break
+    if float(limit_resolution) > resolution_initial:
+        limit_resolution = resolution_initial
+    print('limit resolution to FSC=0.143', limit_resolution)
 
     check_final = (half_str == "class001") 
-
     execute_external_relion(sys.argv[1]) 
 
     if (check_final is True):
@@ -261,36 +272,7 @@ if __name__=="__main__":
         print("Important information for the final iteration!!!")
         print("The final half_unfil maps are generated with relion not spIsoNet")
         print("You may want to further use spIsoNet to improve the final maps")
-        print("spIsoNet commands to correct final maps are:")
-
     else:
-        # sync1 = '%s/%s_it%s_class001_external_reconstruct.sync1' %(dir,basename,var)
-        # sync2 = '%s/%s_it%s_class001_external_reconstruct.sync2' %(dir,basename,var)
-
-        # if (half_str == 'half2'):
-        #     write_to_file(sync2)
-        #     fsc_resolution = wait_until_file(sync1)
-        #     fsc_resolution = float(fsc_resolution)
-        #     print(f"limit resolution to {fsc_resolution}")
-
-        # elif (half_str == 'half1'):
-        #     wait_until_file(sync2)
-        #     from spIsoNet.util.FSC import calculate_resolution
-        #     mrc1_unfil = '%s/%s_it%s_half1_class001_unfil.mrc' %(dir,basename,var)
-        #     mrc2_unfil = '%s/%s_it%s_half2_class001_unfil.mrc' %(dir,basename,var)
-        #     fscn='%s/%s_it%s_3DFSC.mrc' %(dir,basename,var)    
-        #     fsc_resolution = calculate_resolution(mrc1_unfil, mrc2_unfil, mask_file=mask_file, voxel_size=sampling, threshold=0.143)
-        #     print(f"FSC=0.143: {fsc_resolution}")
-        #     if fsc_resolution < 2.1*sampling:
-        #         fsc_resolution = limit_resolution
-        #     print(f"limit resolution to {fsc_resolution}")
-        #     write_to_file(sync1,str(fsc_resolution))
-        # if limit_resolution < 100:
-        #     fsc_resolution = limit_resolution
-        if float(limit_resolution) > resolution_initial:
-            limit_resolution = resolution_initial
-        print(f"real limit resolution to {limit_resolution}")
-
         mrc_initial = '%s/%s_it000_%s_class001.mrc' %(dir,basename,half_str)
         mrc_unfil = '%s/%s_it%s_%s_class001_unfil.mrc' %(dir,basename,var,half_str)
         mrc_unfil_backup = '%s/%s_it%s_%s_class001_unfil_backup.mrc' %(dir,basename,var,half_str)
@@ -315,44 +297,109 @@ if __name__=="__main__":
             shutil.copy(mrc_unfil, mrc_combine_backup)
             shutil.copy(mrc_unfil, mrc_overwrite)
 
-        if lowpass:
-            s = f"relion_image_handler --i {mrc_unfil} --o {mrc_lowpass_backup} --lowpass {limit_resolution}; \
-                cp {mrc_lowpass_backup} {mrc_unfil}"
-            print(s)
-            check_output(s, shell=True)
-            shutil.copy(mrc_unfil, mrc_overwrite) 
-
+        # if lowpass:
+        #     s = f"relion_image_handler --i {mrc_unfil} --o {mrc_lowpass_backup} --lowpass {limit_resolution}; \
+        #         cp {mrc_lowpass_backup} {mrc_unfil}"
+        #     print(s)
+        #     check_output(s, shell=True)
+        #     shutil.copy(mrc_unfil, mrc_overwrite) 
+        
         sync3 = '%s/%s_it%s_class001_external_reconstruct.sync3' %(dir,basename,var)
         sync4 = '%s/%s_it%s_class001_external_reconstruct.sync4' %(dir,basename,var)
 
-        if (healpix >= limit_healpix) and (limit_resolution < 15) and (half_str == 'half2'):
-            write_to_file(sync4)
-            wait_until_file(sync3)
 
-        elif (healpix >= limit_healpix) and (limit_resolution < 15) and (half_str == 'half1'):
-            wait_until_file(sync4)
-            
+    mrc_unfil = '%s/%s_it%s_%s_class001_unfil.mrc' %(dir,basename,var,half_str)
+    mrc_overwrite = '%s/%s_it%s_%s_class001_external_reconstruct.mrc' %(dir,basename,var,half_str)
+    time.sleep(10)
+    for i in range(1,15):
+        try:
+            with mrcfile.open(mrc_unfil) as f2:
+                pass#f2.data.astype(np.float32).copy() 
+            with mrcfile.open(mrc_overwrite) as f2:
+                pass#f2.data.astype(np.float32).copy() 
+        except:
+            print("Waiting for half2")
+            time.sleep(10)
+
+    if healpix <= int(lowres_end_healpix) and (check_final is False):
+
+        mrc_initial = '%s/%s_it000_%s_class001.mrc' %(dir,basename,half_str)
+        mrc_unfil = '%s/%s_it%s_%s_class001_unfil.mrc' %(dir,basename,var,half_str)
+        mrc_unfil_backup = '%s/%s_it%s_%s_class001_unfil_backup.mrc' %(dir,basename,var,half_str)
+        mrc_overwrite = '%s/%s_it%s_%s_class001_external_reconstruct.mrc' %(dir,basename,var,half_str)
+        mrc_overwrite_backup = '%s/%s_it%s_%s_class001_external_reconstruct_backup.mrc' %(dir,basename,var,half_str)
+
+        shutil.copy(mrc_unfil, mrc_unfil_backup)
+        shutil.copy(mrc_overwrite, mrc_overwrite_backup)
+        print(mrc_initial,mrc_unfil,mrc_unfil,resolution_initial)
+        execute_combine(mrc_initial,mrc_unfil,mrc_unfil,resolution_initial) 
+        shutil.copy(mrc_unfil, mrc_overwrite)
+        
+    debug_mode =True
+    if (healpix < limit_healpix):
+        #run_it000_half1_class001  
+        time.sleep(5)    
+
+    elif (check_final is True):
+        mrc_final1 = '%s/%s_half1_class001_unfil.mrc' %(dir,basename)
+        mrc_final2 = '%s/%s_half2_class001_unfil.mrc' %(dir,basename)
+        final_fsc = '%s/%s_3DFSC.mrc' %(dir,basename)
+        print("-----------")
+        print("Important information for the final iteration!!!")
+        print("The final half_unfil maps are generated with relion")
+        print("You may want to further use IsoNet to correct the final maps")
+        print("spIsoNet commands to correct final maps are:")
+        print(f"spisonet.py fsc3d {mrc_final1} {mrc_final2} -o {final_fsc}")
+        print(f"spisonet.py map_refine {mrc_final1} {final_fsc} --output_dir {dir} --mask {mask_file}")
+        print(f"spisonet.py map_refine {mrc_final2} {final_fsc} --output_dir {dir} --mask {mask_file}")
+
+    elif (half_str == 'half1'):     
+
+        sampling_index = None
+        with open("%s/%s_it%s_data.star" %(dir,basename,beforeVar)) as f:
+            for line in f.readlines():
+                if "_rlnImagePixelSize" in line:
+                    sampling_index = int(line.split()[1].split("#")[1])
+                if "opticsGroup1" in line:
+                    sampling = float(line.split()[sampling_index-1])
+                    print("pixel size = %s" %sampling) 
+
+
+        if limit_resolution < 10:
+
+            use_unfil = True
+            if use_unfil:
+                ext = "unfil"
+            else:
+                ext = "external_reconstruct"    
             mrc1_overwrite = '%s/%s_it%s_half1_class001_external_reconstruct.mrc' %(dir,basename,var)
             mrc2_overwrite = '%s/%s_it%s_half2_class001_external_reconstruct.mrc' %(dir,basename,var)
-            mrc1_unfil = '%s/%s_it%s_half1_class001_unfil.mrc' %(dir,basename,var)
-            mrc2_unfil = '%s/%s_it%s_half2_class001_unfil.mrc' %(dir,basename,var)
-            mrc1_cor = '%s/corrected_%s_it%s_half1_class001_unfil.mrc' %(dir,basename,var)
-            mrc2_cor = '%s/corrected_%s_it%s_half2_class001_unfil.mrc' %(dir,basename,var)
-            fscn='%s/%s_it%s_3DFSC.mrc' %(dir,basename,var)    
+            mrc1 = '%s/%s_it%s_half1_class001_%s.mrc' %(dir,basename,var,ext)
+            mrc2 = '%s/%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext)
+            mrc1_whiten = '%s/%s_it%s_half1_class001_%s_whiten.mrc' %(dir,basename,var,ext)
+            mrc2_whiten = '%s/%s_it%s_half2_class001_%s_whiten.mrc' %(dir,basename,var,ext)
 
-            # execute 3dfsc
-            execute_3dfsc(mrc1_unfil, mrc2_unfil, fscn, limit_res=limit_resolution, mask_file=mask_file)    
-            print(f"using FSC3D file {fscn}")
+
+
+            for i in range(1,15):
+                try:
+                    with mrcfile.open(mrc2) as f2:
+                        pass#f2.data.astype(np.float32).copy() 
+                    with mrcfile.open(mrc2_overwrite) as f2:
+                        pass#f2.data.astype(np.float32).copy() 
+                except:
+                    print("Waiting for half2")
+                    time.sleep(10)
 
             #Force write pixelsize
-            with mrcfile.open(mrc1_unfil) as f1:
+            with mrcfile.open(mrc1) as f1:
                 emMap1 = f1.data.astype(np.float32).copy()  
-            with mrcfile.open(mrc2_unfil) as f2:
+            with mrcfile.open(mrc2) as f2:
                 emMap2 = f2.data.astype(np.float32).copy()   
-            with mrcfile.new(mrc1_unfil, overwrite=True) as f1:
+            with mrcfile.new(mrc1, overwrite=True) as f1:
                 f1.set_data(emMap1.astype(np.float32))
                 f1.voxel_size = tuple([sampling]*3)
-            with mrcfile.new(mrc2_unfil, overwrite=True) as f2:
+            with mrcfile.new(mrc2, overwrite=True) as f2:
                 f2.set_data(emMap2.astype(np.float32))
                 f2.voxel_size = tuple([sampling]*3)
 
@@ -362,19 +409,57 @@ if __name__=="__main__":
             mean2_before =  emMap2.mean()  
             std1_before =  emMap1.std()                  
             std2_before =  emMap2.std()  
+
+            # execute 3dfsc
+            fscn='%s/%s_it%s_3DFSC.mrc' %(dir,basename,var)    
+            execute_3dfsc(mrc1,mrc2,fscn, limit_res=limit_resolution, mask_file=mask_file)    
+            print(f"using FSC3D file {fscn}")
         
             # looking for pretrained model
-            model = '%s/%s_it%s_half_class001_unfil.pt' %(dir,basename,beforeVar)
-            print(model)
+
+            model = '%s/%s_it%s_half1_class001_%s.pt' %(dir,basename,beforeVar,ext)
             if not os.path.isfile(model):
-                print(f"first isonet reconstruction for {start_epochs} epochs, because previous iteration healpix order become {limit_healpix}")
+                print(f"first isonet reconstruction for {start_epochs} epochs, because previous iteration healpix order becomes {limit_healpix}")
                 model = None
                 epochs = start_epochs
             if retrain:
                 print(f"retrain network each relion iteration")
                 model = None
             if model is not None:
-                print("reuse network from previous relion iteration")
+                print("reuse network from previous relion iteration")            
+            execute_deep(mrc1, mrc2, fscn, dir,  gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model, batch_size = None, acc_batches=acc_batches, alpha=alpha, beta=0)
+
+            # whiten
+            if whitening:
+                execute_whitening(mrc1, mrc1_whiten, high_res=limit_resolution)   
+                execute_whitening(mrc2, mrc2_whiten, high_res=limit_resolution) 
+                mrc1 =  mrc1_whiten
+                mrc2 =  mrc2_whiten
+                out_mrc1 = '%s/corrected_%s_it%s_half1_class001_%s_whiten.mrc' %(dir,basename,var,ext)
+                out_mrc2 = '%s/corrected_%s_it%s_half2_class001_%s_whiten.mrc' %(dir,basename,var,ext)
+            else:
+                out_mrc1 = '%s/corrected_%s_it%s_half1_class001_%s.mrc' %(dir,basename,var,ext)
+                out_mrc2 = '%s/corrected_%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext)
+            time.sleep(5)
+
+            if denoise:
+                model = '%s/%s_it%s_half_class001_%s.pt' %(dir,basename,beforeVar,ext)
+                if whitening:
+                    model = '%s/%s_it%s_half_class001_%s_whiten.pt' %(dir,basename,beforeVar,ext)
+
+                if not os.path.isfile(model):
+                    print(f"first isonet reconstruction for {start_epochs} epochs, because previous iteration healpix order become {limit_healpix}")
+                    model = None
+                    epochs = start_epochs
+                if retrain:
+                    print(f"retrain network each relion iteration")
+                    model = None
+                if model is not None:
+                    print("reuse network from previous relion iteration")
+                fscn = None
+                execute_deep(mrc1, mrc2, fscn, dir,  gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model, batch_size = None, acc_batches=acc_batches, alpha=alpha, beta=beta)
+
+
 
             # Use previous model for prediction
             # if debug_mode:
@@ -384,29 +469,12 @@ if __name__=="__main__":
             #     shutil.move(out_mrc2, '%s/prepredicted_%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext))
 
             # train and predict
-            execute_deep(mrc1_unfil, mrc2_unfil, fscn, dir,  gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model, batch_size = None, acc_batches=acc_batches, alpha=alpha, beta=beta)
+         
 
-            with mrcfile.open(mrc1_cor) as d1:
+            with mrcfile.open(out_mrc1) as d1:
                 emDeep1 = d1.data.astype(np.float32).copy() 
-            with mrcfile.open(mrc2_cor) as d2:
+            with mrcfile.open(out_mrc2) as d2:
                 emDeep2 = d2.data.astype(np.float32).copy()              
-
-
-            if True:
-                print("combine FSC")
-                with mrcfile.open(fscn) as fn:
-                    fscMap = fn.data.astype(np.float32).copy()  
-                normed_emMap1 = (emMap1-np.mean(emMap1))/np.std(emMap1)
-                normed_emMap2 = (emMap2-np.mean(emMap2))/np.std(emMap2)
-
-                from spIsoNet.util.FSC import apply_F_filter
-                inside1 = apply_F_filter(normed_emMap1,fscMap)
-                outside1 = apply_F_filter(emDeep1,1-fscMap)
-                inside2 = apply_F_filter(normed_emMap2,fscMap)
-                outside2 = apply_F_filter(emDeep2,1-fscMap)
-                emDeep1 = inside1 + outside1
-                emDeep2 = inside2 + outside2
-
 
             finalMap1 = emDeep1*float(std1_before)+mean1_before
             finalMap2 = emDeep2*float(std2_before)+mean2_before
@@ -424,22 +492,19 @@ if __name__=="__main__":
             #     os.remove(out_mrc2)  
 
             if lowpass:
-                #with mrcfile.open(fscn, 'r') as mrc:
-                #    fsc = mrc.data
-                #from spIsoNet.util.FSC import recommended_resolution
-                #res = recommended_resolution(fsc, sampling, 0.143)
-                #print(f"3DFSC resolution {res}")
+                with mrcfile.open(fscn, 'r') as mrc:
+                    fsc = mrc.data
+                from spIsoNet.util.FSC import recommended_resolution
+                res = recommended_resolution(fsc, sampling, 0.143)
+                print(f"3DFSC resolution {res}")
                 from subprocess import check_output
-                s = f"relion_image_handler --i {mrc1_overwrite} --o tmp.mrc --lowpass {limit_resolution}; mv tmp.mrc {mrc1_overwrite}"
+                s = f"relion_image_handler --i {mrc1_overwrite} --o tmp.mrc --lowpass {res}; mv tmp.mrc {mrc1_overwrite}"
                 check_output(s, shell=True)
-                s = f"relion_image_handler --i {mrc2_overwrite} --o tmp.mrc --lowpass {limit_resolution}; mv tmp.mrc {mrc2_overwrite}"
+                s = f"relion_image_handler --i {mrc2_overwrite} --o tmp.mrc --lowpass {res}; mv tmp.mrc {mrc2_overwrite}"
                 check_output(s, shell=True)
 
             print("finished spisonet reconstruction")
-            write_to_file(sync3)
-
-
-
-
-        
+        else:
+            print("skip this iteration of spIsoNet")
+     
             

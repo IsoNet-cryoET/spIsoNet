@@ -53,9 +53,8 @@ def ddp_train(rank, world_size, port_number, model,alpha, beta, data_path, batch
     if torch.__version__ >= "2.0.0":
         GPU_capability = torch.cuda.get_device_capability()
         if GPU_capability[0] >= 7:
-            print(GPU_capability)
             torch.set_float32_matmul_precision('high')
-            model = torch.compile(model)
+            #model = torch.compile(model)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     #torch.backends.cuda.matmul.allow_tf32 = True
     #torch.backends.cudnn.allow_tf32 = True

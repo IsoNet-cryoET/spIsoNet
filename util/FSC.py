@@ -22,7 +22,31 @@ def calculate_resolution(half1_file, half2_file, mask_file=None, voxel_size=1, t
     fsc_map = get_FSC_map([h1,h2],mask)
     return recommended_resolution(fsc_map, voxel_size, threshold = threshold)
 
-def recommended_resolution(fsc3d, voxel_size, threshold = 0.5):
+def combine_map_F(low_data, high_data, threshold_res, voxel_size, mask_data=None):
+    from spIsoNet.util.FSC import get_sphere,apply_F_filter,match_spectrum
+
+    if mask_data not in [None,'None']:
+        low_data = match_spectrum(low_data, high_data,mask_data)
+    else:
+        low_data = match_spectrum(low_data, high_data,None)
+
+    nz = low_data.shape[0]
+    rad = nz*voxel_size/threshold_res
+    F_map = get_sphere(rad,nz)
+
+    high_data_low = apply_F_filter(high_data,F_map)
+    out_low = apply_F_filter(low_data,F_map)
+
+    out_low = (out_low-out_low.mean())/out_low.std()*high_data_low.std() + high_data_low.mean()
+
+    out_high = apply_F_filter(high_data,1-F_map)
+
+    out_data = out_low + out_high
+    out_data = (out_data-out_data.mean())/out_data.std()*high_data.std() + high_data.mean()
+
+    return out_data
+
+def recommended_resolution(fsc3d, voxel_size, threshold = 0.143):
     diameter = fsc3d.shape[0]
     center = diameter//2
     grid  = np.mgrid[0:diameter,0:diameter,0:diameter]
@@ -37,7 +61,7 @@ def recommended_resolution(fsc3d, voxel_size, threshold = 0.5):
     return 2 * voxel_size
 
 
-def get_sphere(rad,dim,smooth_pixels=3):
+def get_sphere(rad,dim,smooth_pixels=5):
     F_map = np.zeros([dim,dim,dim], dtype = np.float32)
 
     r = np.arange(dim)-dim//2
@@ -53,6 +77,29 @@ def get_sphere(rad,dim,smooth_pixels=3):
 
     return F_map
 
+def lowpass(in_map, resolution, pixel_size, smooth_pixels = 3):
+    nz = in_map.shape[0]
+    rad = nz * pixel_size / resolution
+    mask = get_sphere(rad,nz,smooth_pixels=smooth_pixels)
+    F_map = fftshift(fftn(in_map))
+    filtered_F_map = F_map*mask
+    out_map = ifftn(fftshift(filtered_F_map))
+    out_map =  np.real(out_map).astype(np.float32)
+    return out_map
+
+def get_donut(size, r_in, r_out):
+    mask = np.zeros([size,size,size], dtype = np.float32)
+
+    r = np.arange(size)-size//2
+
+    [Z,Y,X] = np.meshgrid(r,r,r)
+    index = np.round(np.sqrt(Z**2+Y**2+X**2))
+
+    for i in range(r_in, r_out):
+        mask[index==i] = 1
+
+    return mask
+
 def apply_F_filter(input_map,F_map):
 
     F_input = fftn(input_map)
@@ -60,16 +107,37 @@ def apply_F_filter(input_map,F_map):
     out =  np.real(out).astype(np.float32)
     return out
 
-def match_spectrum(input_map,F_map):
-    #problematic
-    h1 = input_map
-    f1 = fftshift(fftn(h1))
-    n1 = np.real(np.multiply(f1,np.conj(f1)))
-    nf1 = f1/np.sqrt(n1*n1)
+def match_spectrum(target_map,source_map, mask = None):
+    nz = target_map.shape[0]
+    if mask is None:
+        mask = 1
+    masked_target_map = target_map * mask
+    masked_source_map = source_map * mask
 
-    out = ifftn(nf1*fftshift(F_map))
-    out =  np.real(out).astype(np.float32)
-    return out
+    f1 = fftshift(fftn(masked_target_map))
+    ps1 = np.sqrt(np.real(np.multiply(f1,np.conj(f1))))
+    
+    f2 = fftshift(fftn(masked_source_map))
+    ps2 = np.sqrt(np.real(np.multiply(f2,np.conj(f2))))
+
+    ra1 = rotational_average(ps1)
+    ra2 = rotational_average(ps2)
+
+    ra1[np.abs(ra1)<1e-7] = 1e-7
+
+    ratio = ra2/ra1
+
+    weight_mat = np.zeros((nz,nz,nz), dtype=np.float32)
+    r = np.arange(nz) - nz // 2
+    [Z,Y,X] = np.meshgrid(r,r,r)
+    index = (np.sqrt(Z**2+Y**2+X**2)).astype(int)
+    for i in range(nz//2):
+        weight_mat[index==i] = ratio[i]
+
+    F_map = fftshift(fftn(target_map))
+    out_map = ifftn(fftshift(F_map*weight_mat))
+    out_map =  np.real(out_map).astype(np.float32)
+    return out_map
 
 
 def get_rayFSC(data, limit_r, n_sampling= 3, preserve_prec = 50):
@@ -117,6 +185,51 @@ def get_rayFSC(data, limit_r, n_sampling= 3, preserve_prec = 50):
     
     return ray_FSC
 
+def FSC_weighting(input_map, FSC_curve, weight = True):
+    nz = input_map.shape[0]
+    assert FSC_curve.shape[0] == nz//2
+
+    FSC_curve[FSC_curve<0] = 0
+
+    if weight:
+        #sqrt(2*FSC/(FSC+1))
+        FSC_curve = np.sqrt(2*FSC_curve/(FSC_curve+1))
+
+    weight_mat = np.zeros((nz,nz,nz), dtype=np.float32)
+    r = np.arange(nz) - nz // 2
+    [Z,Y,X] = np.meshgrid(r,r,r)
+    index = (np.sqrt(Z**2+Y**2+X**2)).astype(int)
+    for i in range(nz//2):
+        weight_mat[index == i] = FSC_curve[i]
+
+    F_map = fftshift(fftn(input_map)) * weight_mat
+    out_map = np.real(ifftn(fftshift(F_map))).astype(np.float32)
+    return out_map
+
+def angular_whitening(h, ncpus: int=16, 
+                limit_r: float=None, 
+                cone_sampling_angle: float=10,
+                ):
+
+    """
+    \ntrain neural network to correct preffered orientation\n
+    spisonet.py map_refine half1.mrc half2.mrc mask.mrc [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
+    :param h: Input name of half1
+    :param h2: Input name of half2
+    :param mask: Filename of a user-provided mask
+    :param ncpus: Number of cpu.
+    :param limit_res: The resolution limit for recovery, default is the resolution of the map.
+    :param fsc_file: 3DFSC file if not set, isonet will generate one.
+    :param cone_sampling_angle: Angle for 3D fsc sampling for spIsoNet generated 3DFSC. spIsoNet default is 10 degrees, the default for official 3DFSC is 20 degrees.
+    """
+
+
+    F_map = fftshift(fftn(h))
+    fsc3d = ThreeD_FSC(F_map, limit_r,angle=float(cone_sampling_angle), n_processes=ncpus)
+
+    return fsc3d.astype(np.float32)
+
+
 def get_FSC_map(halfmaps, mask):
     h1 = halfmaps[0] * mask
     h2 = halfmaps[1] * mask
@@ -133,7 +246,7 @@ def rotational_average(input_map):
     r = np.arange(nz)-nz//2
 
     [Z,Y,X] = np.meshgrid(r,r,r)
-    index = np.round(np.sqrt(Z**2+Y**2+X**2))
+    index = (np.sqrt(Z**2+Y**2+X**2)).astype(int)
 
     FSC_curve = np.zeros(nz//2)
     for i in range(nz//2):
@@ -179,6 +292,144 @@ def ThreeD_FSC(FSC_map, limit_r=None, angle=20, n_processes=16):
             out[pixels_T] = result.get()
     return out
 
+def filter_weight(h_map, fsc3d, low_r, high_r):
+    from spIsoNet.util.FSC import get_donut
+    from numpy.fft import fftshift,fftn,ifftn
+    import numpy as np
+    mask_donut = get_donut(h_map.shape[0], int(low_r), int(high_r))
+    condition = (mask_donut > 0.5)
+
+    F_h_map = fftn(h_map)
+
+    fsc3d_donut = fsc3d * mask_donut
+    invert_fsc3d_donut = (1-fsc3d) * mask_donut
+
+    res_in = np.real(ifftn(F_h_map * fftshift(fsc3d_donut))).astype(np.float32)
+    res_out = np.real(ifftn(F_h_map * fftshift(invert_fsc3d_donut))).astype(np.float32)
+
+    f1 = fftshift(F_h_map)
+    FD = np.abs(np.real(np.multiply(f1,np.conj(f1))))**0.5
+
+    m_in = np.mean((FD*fsc3d)[condition])
+    m_out = np.mean((FD*(1-fsc3d))[condition])
+
+    n_in = np.mean(fsc3d[condition])
+    n_out = np.mean((1-fsc3d)[condition])
+
+    w_in = n_in/m_in
+    w_out = n_out/m_out
+    print(m_in,m_out,n_in,n_out,w_in,w_out)
+    in_donut = (res_in*w_in + res_out*w_out)/(w_in + w_out)
+
+    in_donut = np.real(ifftn(fftn(in_donut) * fftshift(fsc3d_donut))).astype(np.float32)
+    out_donut = np.real(ifftn(F_h_map * fftshift(1-mask_donut))).astype(np.float32)
+
+    return in_donut + out_donut
+
+def fsc_matching(h_target, h_source, fsc3d, low_r, high_r):
+    from spIsoNet.util.FSC import get_donut
+    from numpy.fft import fftshift,fftn,ifftn
+    import numpy as np
+    mask_donut = get_donut(h_target.shape[0], int(low_r), int(high_r))
+    condition = (mask_donut > 0.5)
+
+    F_target = fftn(h_target)
+    F_source = fftn(h_source)
+
+    shifted_F_source = fftshift(F_source)
+
+    P_source = np.abs(np.real(np.multiply(shifted_F_source,np.conj(shifted_F_source))))**0.5
+
+    m_in = np.mean((P_source*fsc3d)[condition])
+    m_out = np.mean((P_source*(1-fsc3d))[condition])
+
+    n_in = np.mean(fsc3d[condition])
+    n_out = np.mean((1-fsc3d)[condition])
+
+    w_in = m_in/n_in
+    w_out = m_out/n_out
+
+    print(m_in,m_out,n_in,n_out,w_in,w_out)
+    fsc3d_donut = fsc3d * mask_donut
+    invert_fsc3d_donut = (1-fsc3d) * mask_donut
+
+    res_in = np.real(ifftn(F_target * fftshift(fsc3d_donut))).astype(np.float32)
+    res_out = np.real(ifftn(F_target * fftshift(invert_fsc3d_donut))).astype(np.float32)
+
+    in_donut = (res_in*w_in + res_out*w_out)/(w_in + w_out)
+    out_donut = np.real(ifftn(F_target * fftshift(1-mask_donut))).astype(np.float32)
+
+    return in_donut + out_donut
+
+def angular_whitening(in_name,out_name,resolution_initial, limit_resolution):
+    import mrcfile
+    from numpy.fft import fftn,fftshift,ifftn
+    from spIsoNet.util.FSC import apply_F_filter
+    import numpy as np
+    import skimage
+
+
+    with mrcfile.open(in_name) as mrc:
+        in_map = mrc.data.copy()
+        voxel_size = mrc.voxel_size.x
+
+    F_map = fftn(in_map)
+    shifted_F_map = fftshift(F_map)
+    F_power = np.real(np.multiply(shifted_F_map,np.conj(shifted_F_map)))**0.5
+    F_power = F_power.astype(np.float32)
+    nz = 36
+    downsampled_F_map = skimage.transform.resize(F_power, [nz,nz,nz])
+
+    low_r = nz * voxel_size / resolution_initial
+    high_r = nz * voxel_size / limit_resolution
+    print(low_r)
+    print(high_r)
+
+    x, y, z = np.meshgrid(np.arange(nz), np.arange(nz), np.arange(nz))
+
+    direction_vectors = np.stack([x - nz // 2, y - nz // 2, z - nz // 2], axis=-1)
+    direction_vectors = direction_vectors.reshape((nz**3,3))
+
+    d = np.linalg.norm(direction_vectors, axis=-1)
+    condition = np.logical_and((d > low_r), (d < high_r))
+
+    distances = d[condition]
+    direction_vectors = direction_vectors[condition]
+
+    normalized_vectors = direction_vectors / distances[:,np.newaxis]
+    normalized_vectors = normalized_vectors.astype(np.float32)
+    normalized_matrix = np.matmul(normalized_vectors, np.transpose(normalized_vectors))
+
+    half_angle_rad = np.radians(20)
+    half_angle_cos = np.cos(half_angle_rad)
+    normalized_matrix = (np.abs(normalized_matrix) > half_angle_cos).astype(np.float32)
+
+    sum_matrix = np.sum(normalized_matrix, axis = -1)
+
+    input_flatterned_matrix = downsampled_F_map.reshape((nz**3,1))[condition]
+
+    out_values = np.matmul(normalized_matrix, input_flatterned_matrix).squeeze()/sum_matrix
+
+    out_matrix = np.zeros((nz**3,), dtype = np.float32)
+    out_matrix[condition] = 1/out_values
+    #out_matrix[d<=low_r] = np.max(out_matrix[d<=(low_r+1)])
+    out_matrix = out_matrix.reshape((nz,nz,nz))
+    # with mrcfile.new("tmp.mrc", overwrite=True) as mrc:
+    #     mrc.set_data(out_matrix.astype(np.float32))
+    map_dim = in_map.shape[0]
+    out_matrix = skimage.transform.resize(out_matrix, [map_dim,map_dim,map_dim])
+
+    # with mrcfile.new("tmp.mrc", overwrite=True) as mrc:
+    #     mrc.set_data(out_matrix.astype(np.float32))
+
+    transformed_data = np.real(ifftn(F_map*fftshift(out_matrix))).astype(np.float32)
+    transformed_data =  (transformed_data-np.mean(transformed_data))/np.std(transformed_data)
+    transformed_data =   transformed_data*np.std(in_map) + np.mean(in_map)
+    reverse_filter = (out_matrix<0.0000001).astype(int)
+    in_map_filtered = apply_F_filter(in_map,reverse_filter)
+    with mrcfile.new(out_name, overwrite=True) as mrc:
+        mrc.set_data((transformed_data+in_map_filtered).astype(np.float32))
+        mrc.voxel_size = tuple([voxel_size]*3) 
 if __name__ == '__main__':
         
     fNHalfMap1='emd_8731_half_map_1.mrc'

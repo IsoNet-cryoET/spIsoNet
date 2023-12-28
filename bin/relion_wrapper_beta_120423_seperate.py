@@ -33,7 +33,7 @@ def execute_external_relion(star):
     params += ' %s' %star
     os.system(params)     
     
-def execute_deep(mrc1, mrc2, fsc3d, dir, gpu, epochs = 1, mask_file = None, pretrained_model=None, alpha = None, acc_batches= None, batch_size = None, beta=None): 
+def execute_deep_n2n(mrc1, mrc2, fsc3d, dir, gpu, epochs = 1, mask_file = None, pretrained_model=None, alpha = None, acc_batches= None, batch_size = None, beta=None): 
     #data_file =  ' %s/%s_it%s_half%s_class001_external_reconstruct.mrc' %(dir, basename, var, half)   
     params = ' eval "$(conda shell.bash hook)" && conda activate %s && ' %CONDA_ENV     
     params += ' spisonet.py refine_n2n '
@@ -55,6 +55,29 @@ def execute_deep(mrc1, mrc2, fsc3d, dir, gpu, epochs = 1, mask_file = None, pret
     if mask_file is not None:
         params += ' --mask %s' %(mask_file)
 
+    print(params)
+    os.system(params)
+
+def execute_deep(data_file, dir, basename, var, gpu, epochs = 1, mask_file = None, pretrained_model=None, alpha = None, acc_batches= None, batch_size = None): 
+    #data_file =  ' %s/%s_it%s_half%s_class001_external_reconstruct.mrc' %(dir, basename, var, half)   
+    print(f"processing {data_file}")  
+    params = ' eval "$(conda shell.bash hook)" && conda activate %s && ' %CONDA_ENV     
+    params += ' spisonet.py refine '
+    params += data_file      
+    params += ' %s/%s_it%s_3DFSC.mrc' %(dir, basename, var) 
+    params += ' --epochs %s --n_subvolume 1000'   %(epochs)
+    if acc_batches is not None:
+        params += ' --acc_batches %s'   %(acc_batches) 
+    if batch_size is not None:
+        params += ' --batch_size %s'   %(batch_size) 
+    if alpha is not None:
+        params += ' --alpha %s'   %(alpha) 
+    params += ' --output_dir %s' %(dir) 
+    params += ' --gpuID %s' %(gpu) 
+    if pretrained_model is not None:
+        params += ' --pretrained_model %s' %(pretrained_model)
+    if mask_file is not None:
+        params += ' --mask %s' %(mask_file)
     print(params)
     os.system(params)
 
@@ -171,7 +194,7 @@ if __name__=="__main__":
 
     gpu = parse_env("CUDA_VISIBLE_DEVICES", "string", gpu_list)
     CONDA_ENV = parse_env("CONDA_ENV", "string", None)
-    whitening = parse_env("ISONET_WHITENING", "bool", True)
+    whitening = parse_env("ISONET_WHITENING", "bool", False)
     whitening_low = parse_env("ISONET_WHITENING_LOW", "float", 10)
     retrain = parse_env("ISONET_RETRAIN_EACH_ITER", "bool", False)
     beta = parse_env("ISONET_BETA", "float", 0.5)
@@ -324,12 +347,19 @@ if __name__=="__main__":
 
         sync3 = '%s/%s_it%s_class001_external_reconstruct.sync3' %(dir,basename,var)
         sync4 = '%s/%s_it%s_class001_external_reconstruct.sync4' %(dir,basename,var)
+        print(int(var))
+        if int(var)%2 == 1:
+            signal1="half1"
+            signal2="half2"
+        else:
+            signal1="half2"
+            signal2="half1"
 
-        if (healpix >= limit_healpix) and (limit_resolution < 15) and (half_str == 'half2'):
+        if (healpix >= limit_healpix) and (limit_resolution < 15) and (half_str == signal2):
             write_to_file(sync4)
             wait_until_file(sync3)
 
-        elif (healpix >= limit_healpix) and (limit_resolution < 15) and (half_str == 'half1'):
+        elif (healpix >= limit_healpix) and (limit_resolution < 15) and (half_str == signal1):
             wait_until_file(sync4)
             
             mrc1_overwrite = '%s/%s_it%s_half1_class001_external_reconstruct.mrc' %(dir,basename,var)
@@ -364,18 +394,26 @@ if __name__=="__main__":
             std2_before =  emMap2.std()  
         
             # looking for pretrained model
-            model = '%s/%s_it%s_half_class001_unfil.pt' %(dir,basename,beforeVar)
-            print(model)
-            if not os.path.isfile(model):
-                print(f"first isonet reconstruction for {start_epochs} epochs, because previous iteration healpix order become {limit_healpix}")
-                model = None
-                epochs = start_epochs
-            if retrain:
-                print(f"retrain network each relion iteration")
-                model = None
-            if model is not None:
-                print("reuse network from previous relion iteration")
+            # model = '%s/%s_it%s_half_class001_unfil.pt' %(dir,basename,beforeVar)
+            # print(model)
+            # if not os.path.isfile(model):
+            #     print(f"first isonet reconstruction for {start_epochs} epochs, because previous iteration healpix order become {limit_healpix}")
+            #     model = None
+            #     epochs = start_epochs
+            # if retrain:
+            #     print(f"retrain network each relion iteration")
+            #     model = None
+            # if model is not None:
+            #     print("reuse network from previous relion iteration")
 
+            model1 = '%s/%s_it%s_half1_class001_unfil.pt' %(dir,basename,beforeVar)
+            model2 = '%s/%s_it%s_half2_class001_unfil.pt' %(dir,basename,beforeVar)
+
+            if not os.path.isfile(model1):
+                print(f"first isonet reconstruction, because previous iteration healpix order become {limit_healpix}")
+                model1 = None
+                model2 = None
+                epochs = 5 
             # Use previous model for prediction
             # if debug_mode:
             #     execute_deep(mrc1,fscn, dir, gpu, epochs = 0, mask_file = mask_file, pretrained_model = model, batch_size = batch_size, acc_batches=acc_batches, alpha=alpha, beta=beta)
@@ -384,29 +422,14 @@ if __name__=="__main__":
             #     shutil.move(out_mrc2, '%s/prepredicted_%s_it%s_half2_class001_%s.mrc' %(dir,basename,var,ext))
 
             # train and predict
-            execute_deep(mrc1_unfil, mrc2_unfil, fscn, dir,  gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model, batch_size = None, acc_batches=acc_batches, alpha=alpha, beta=beta)
+            #execute_deep(mrc1_unfil, mrc2_unfil, fscn, dir,  gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model, batch_size = None, acc_batches=acc_batches, alpha=alpha, beta=beta)
+            execute_deep(mrc1_unfil, dir, basename, var, gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model1, batch_size = None, acc_batches=acc_batches, alpha=alpha)
+            execute_deep(mrc2_unfil, dir, basename, var, gpu, epochs = epochs, mask_file = mask_file, pretrained_model = model2, batch_size = None, acc_batches=acc_batches, alpha=alpha)
 
             with mrcfile.open(mrc1_cor) as d1:
                 emDeep1 = d1.data.astype(np.float32).copy() 
             with mrcfile.open(mrc2_cor) as d2:
                 emDeep2 = d2.data.astype(np.float32).copy()              
-
-
-            if True:
-                print("combine FSC")
-                with mrcfile.open(fscn) as fn:
-                    fscMap = fn.data.astype(np.float32).copy()  
-                normed_emMap1 = (emMap1-np.mean(emMap1))/np.std(emMap1)
-                normed_emMap2 = (emMap2-np.mean(emMap2))/np.std(emMap2)
-
-                from spIsoNet.util.FSC import apply_F_filter
-                inside1 = apply_F_filter(normed_emMap1,fscMap)
-                outside1 = apply_F_filter(emDeep1,1-fscMap)
-                inside2 = apply_F_filter(normed_emMap2,fscMap)
-                outside2 = apply_F_filter(emDeep2,1-fscMap)
-                emDeep1 = inside1 + outside1
-                emDeep2 = inside2 + outside2
-
 
             finalMap1 = emDeep1*float(std1_before)+mean1_before
             finalMap2 = emDeep2*float(std2_before)+mean2_before

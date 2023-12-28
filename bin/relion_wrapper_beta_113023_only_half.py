@@ -326,11 +326,11 @@ if __name__=="__main__":
         sync4 = '%s/%s_it%s_class001_external_reconstruct.sync4' %(dir,basename,var)
 
         if (healpix >= limit_healpix) and (limit_resolution < 15) and (half_str == 'half2'):
-            write_to_file(sync4)
-            wait_until_file(sync3)
-
+            #write_to_file(sync4)
+            #wait_until_file(sync3)
+            pass
         elif (healpix >= limit_healpix) and (limit_resolution < 15) and (half_str == 'half1'):
-            wait_until_file(sync4)
+            #wait_until_file(sync4)
             
             mrc1_overwrite = '%s/%s_it%s_half1_class001_external_reconstruct.mrc' %(dir,basename,var)
             mrc2_overwrite = '%s/%s_it%s_half2_class001_external_reconstruct.mrc' %(dir,basename,var)
@@ -436,7 +436,7 @@ if __name__=="__main__":
                 check_output(s, shell=True)
 
             print("finished spisonet reconstruction")
-            write_to_file(sync3)
+            #write_to_file(sync3)
 
 
 

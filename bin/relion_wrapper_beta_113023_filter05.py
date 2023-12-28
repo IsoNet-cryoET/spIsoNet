@@ -222,6 +222,7 @@ if __name__=="__main__":
     # limit_resolution: last iter resolution at 0.143
     limit_resolution = 2*sampling
     start_check = 10000
+    limit_resolution_05 = 10000
     with open("%s/%s_it%s_half1_model.star" %(dir,basename,beforeVar)) as file:
         for line_number,li in enumerate(file.readlines()):
             if "_rlnEstimatedResolution " in li:
@@ -236,6 +237,8 @@ if __name__=="__main__":
             if line_number >= start_check:
                 line_split = li.split()
                 if len(line_split)>FSC_index:
+                    if float(line_split[FSC_index-1])> 0.5:
+                        limit_resolution_05 = float(line_split[Aresolution_index-1])
                     if float(line_split[FSC_index-1])<= 0.143:
                         limit_resolution = float(line_split[Aresolution_index-1])
                         break
@@ -289,7 +292,10 @@ if __name__=="__main__":
         #     fsc_resolution = limit_resolution
         if float(limit_resolution) > resolution_initial:
             limit_resolution = resolution_initial
-        print(f"real limit resolution to {limit_resolution}")
+        if limit_resolution_05 == 10000:
+            limit_resolution_05 = limit_resolution
+        print(f"resolution_05: {limit_resolution_05}")
+        print(f"limit resolution to {limit_resolution}")
 
         mrc_initial = '%s/%s_it000_%s_class001.mrc' %(dir,basename,half_str)
         mrc_unfil = '%s/%s_it%s_%s_class001_unfil.mrc' %(dir,basename,var,half_str)
@@ -390,27 +396,9 @@ if __name__=="__main__":
                 emDeep1 = d1.data.astype(np.float32).copy() 
             with mrcfile.open(mrc2_cor) as d2:
                 emDeep2 = d2.data.astype(np.float32).copy()              
-
-
-            if True:
-                print("combine FSC")
-                with mrcfile.open(fscn) as fn:
-                    fscMap = fn.data.astype(np.float32).copy()  
-                normed_emMap1 = (emMap1-np.mean(emMap1))/np.std(emMap1)
-                normed_emMap2 = (emMap2-np.mean(emMap2))/np.std(emMap2)
-
-                from spIsoNet.util.FSC import apply_F_filter
-                inside1 = apply_F_filter(normed_emMap1,fscMap)
-                outside1 = apply_F_filter(emDeep1,1-fscMap)
-                inside2 = apply_F_filter(normed_emMap2,fscMap)
-                outside2 = apply_F_filter(emDeep2,1-fscMap)
-                emDeep1 = inside1 + outside1
-                emDeep2 = inside2 + outside2
-
-
             finalMap1 = emDeep1*float(std1_before)+mean1_before
             finalMap2 = emDeep2*float(std2_before)+mean2_before
-            
+
             #save mrcfile
             with mrcfile.new(mrc1_overwrite, overwrite=True) as fMap1:
                 fMap1.set_data(finalMap1.astype(np.float32))
@@ -418,6 +406,29 @@ if __name__=="__main__":
             with mrcfile.new(mrc2_overwrite, overwrite=True) as fMap2:
                 fMap2.set_data(finalMap2.astype(np.float32))
                 fMap2.voxel_size = tuple([sampling]*3)
+
+            if True:
+                # print("combine FSC")
+                # with mrcfile.open(fscn) as fn:
+                #     fscMap = fn.data.astype(np.float32).copy()  
+                # normed_emMap1 = (emMap1-np.mean(emMap1))/np.std(emMap1)
+                # normed_emMap2 = (emMap2-np.mean(emMap2))/np.std(emMap2)
+
+                # from spIsoNet.util.FSC import apply_F_filter
+                # inside1 = apply_F_filter(normed_emMap1,fscMap)
+                # outside1 = apply_F_filter(emDeep1,1-fscMap)
+                # inside2 = apply_F_filter(normed_emMap2,fscMap)
+                # outside2 = apply_F_filter(emDeep2,1-fscMap)
+                # emDeep1 = inside1 + outside1
+                # emDeep2 = inside2 + outside2
+                execute_combine(mrc1_overwrite,mrc1_unfil,mrc1_overwrite,limit_resolution_05) 
+                execute_combine(mrc1_overwrite,mrc2_unfil,mrc2_overwrite,limit_resolution_05) 
+
+                # shutil.copy(mrc_unfil, mrc_combine_backup)
+                # shutil.copy(mrc_unfil, mrc_overwrite)
+
+            
+
 
             # if not debug_mode:
             #     os.remove(out_mrc1)
