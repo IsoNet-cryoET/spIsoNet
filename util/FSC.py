@@ -22,12 +22,27 @@ def calculate_resolution(half1_file, half2_file, mask_file=None, voxel_size=1, t
     fsc_map = get_FSC_map([h1,h2],mask)
     return recommended_resolution(fsc_map, voxel_size, threshold = threshold)
 
+def recommended_resolution(fsc3d, voxel_size, threshold = 0.143):
+    diameter = fsc3d.shape[0]
+    center = diameter//2
+    grid  = np.mgrid[0:diameter,0:diameter,0:diameter]
+    r = ((grid[0]-center)**2 + (grid[1]-center)**2 + (grid[2]-center)**2)**0.5
+    r = r.astype(np.int32).flatten()
+    a = np.zeros(center, dtype = np.float32)
+    df = fsc3d.flatten()
+    for i in range(len(a)):        
+        a[i] = np.average(df[r==i])
+        if a[i] < threshold:
+            return center/(i+1)*2 * voxel_size
+    return 2 * voxel_size
+
 def combine_map_F(low_data, high_data, threshold_res, voxel_size, mask_data=None):
     from spIsoNet.util.FSC import get_sphere,apply_F_filter,match_spectrum
 
-    if mask_data not in [None,'None']:
+    if isinstance(mask_data,np.ndarray):
         low_data = match_spectrum(low_data, high_data,mask_data)
     else:
+        print("mask is None")
         low_data = match_spectrum(low_data, high_data,None)
 
     nz = low_data.shape[0]
@@ -45,21 +60,6 @@ def combine_map_F(low_data, high_data, threshold_res, voxel_size, mask_data=None
     out_data = (out_data-out_data.mean())/out_data.std()*high_data.std() + high_data.mean()
 
     return out_data
-
-def recommended_resolution(fsc3d, voxel_size, threshold = 0.143):
-    diameter = fsc3d.shape[0]
-    center = diameter//2
-    grid  = np.mgrid[0:diameter,0:diameter,0:diameter]
-    r = ((grid[0]-center)**2 + (grid[1]-center)**2 + (grid[2]-center)**2)**0.5
-    r = r.astype(np.int32).flatten()
-    a = np.zeros(center, dtype = np.float32)
-    df = fsc3d.flatten()
-    for i in range(len(a)):        
-        a[i] = np.average(df[r==i])
-        if a[i] < threshold:
-            return center/(i+1)*2 * voxel_size
-    return 2 * voxel_size
-
 
 def get_sphere(rad,dim,smooth_pixels=5):
     F_map = np.zeros([dim,dim,dim], dtype = np.float32)
@@ -192,7 +192,6 @@ def FSC_weighting(input_map, FSC_curve, weight = True):
     FSC_curve[FSC_curve<0] = 0
 
     if weight:
-        #sqrt(2*FSC/(FSC+1))
         FSC_curve = np.sqrt(2*FSC_curve/(FSC_curve+1))
 
     weight_mat = np.zeros((nz,nz,nz), dtype=np.float32)
@@ -205,30 +204,6 @@ def FSC_weighting(input_map, FSC_curve, weight = True):
     F_map = fftshift(fftn(input_map)) * weight_mat
     out_map = np.real(ifftn(fftshift(F_map))).astype(np.float32)
     return out_map
-
-def angular_whitening(h, ncpus: int=16, 
-                limit_r: float=None, 
-                cone_sampling_angle: float=10,
-                ):
-
-    """
-    \ntrain neural network to correct preffered orientation\n
-    spisonet.py map_refine half1.mrc half2.mrc mask.mrc [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
-    :param h: Input name of half1
-    :param h2: Input name of half2
-    :param mask: Filename of a user-provided mask
-    :param ncpus: Number of cpu.
-    :param limit_res: The resolution limit for recovery, default is the resolution of the map.
-    :param fsc_file: 3DFSC file if not set, isonet will generate one.
-    :param cone_sampling_angle: Angle for 3D fsc sampling for spIsoNet generated 3DFSC. spIsoNet default is 10 degrees, the default for official 3DFSC is 20 degrees.
-    """
-
-
-    F_map = fftshift(fftn(h))
-    fsc3d = ThreeD_FSC(F_map, limit_r,angle=float(cone_sampling_angle), n_processes=ncpus)
-
-    return fsc3d.astype(np.float32)
-
 
 def get_FSC_map(halfmaps, mask):
     h1 = halfmaps[0] * mask
@@ -318,7 +293,6 @@ def filter_weight(h_map, fsc3d, low_r, high_r):
 
     w_in = n_in/m_in
     w_out = n_out/m_out
-    print(m_in,m_out,n_in,n_out,w_in,w_out)
     in_donut = (res_in*w_in + res_out*w_out)/(w_in + w_out)
 
     in_donut = np.real(ifftn(fftn(in_donut) * fftshift(fsc3d_donut))).astype(np.float32)
@@ -349,7 +323,6 @@ def fsc_matching(h_target, h_source, fsc3d, low_r, high_r):
     w_in = m_in/n_in
     w_out = m_out/n_out
 
-    print(m_in,m_out,n_in,n_out,w_in,w_out)
     fsc3d_donut = fsc3d * mask_donut
     invert_fsc3d_donut = (1-fsc3d) * mask_donut
 
@@ -382,8 +355,6 @@ def angular_whitening(in_name,out_name,resolution_initial, limit_resolution):
 
     low_r = nz * voxel_size / resolution_initial
     high_r = nz * voxel_size / limit_resolution
-    print(low_r)
-    print(high_r)
 
     x, y, z = np.meshgrid(np.arange(nz), np.arange(nz), np.arange(nz))
 
@@ -412,15 +383,12 @@ def angular_whitening(in_name,out_name,resolution_initial, limit_resolution):
 
     out_matrix = np.zeros((nz**3,), dtype = np.float32)
     out_matrix[condition] = 1/out_values
-    #out_matrix[d<=low_r] = np.max(out_matrix[d<=(low_r+1)])
+
     out_matrix = out_matrix.reshape((nz,nz,nz))
-    # with mrcfile.new("tmp.mrc", overwrite=True) as mrc:
-    #     mrc.set_data(out_matrix.astype(np.float32))
+
     map_dim = in_map.shape[0]
     out_matrix = skimage.transform.resize(out_matrix, [map_dim,map_dim,map_dim])
 
-    # with mrcfile.new("tmp.mrc", overwrite=True) as mrc:
-    #     mrc.set_data(out_matrix.astype(np.float32))
 
     transformed_data = np.real(ifftn(F_map*fftshift(out_matrix))).astype(np.float32)
     transformed_data =  (transformed_data-np.mean(transformed_data))/np.std(transformed_data)
@@ -430,22 +398,5 @@ def angular_whitening(in_name,out_name,resolution_initial, limit_resolution):
     with mrcfile.new(out_name, overwrite=True) as mrc:
         mrc.set_data((transformed_data+in_map_filtered).astype(np.float32))
         mrc.voxel_size = tuple([voxel_size]*3) 
-if __name__ == '__main__':
-        
-    fNHalfMap1='emd_8731_half_map_1.mrc'
-    fNHalfMap2='emd_8731_half_map_2.mrc' 
 
-    halfmaps = []
-    with mrcfile.open(fNHalfMap1,'r') as mrc:
-        halfmaps.append(mrc.data)
-    with mrcfile.open(fNHalfMap2,'r') as mrc:
-        halfmaps.append(mrc.data)
-
-    FSC_map = get_FSC_map(halfmaps)
-    out = ThreeD_FSC(FSC_map)
-    print('here')
-    with mrcfile.new('FSC.mrc',overwrite=True) as mrc:
-        mrc.set_data(FSC_map.astype(np.float32))   
-    with mrcfile.new('3DFSC.mrc',overwrite=True) as mrc:
-        mrc.set_data(out.astype(np.float32))   
 

@@ -11,16 +11,16 @@ class ConvBlock(nn.Module):
         layers = [
             nn.Conv3d(in_channels=in_channels, out_channels=out_channels,
                     kernel_size=kernel_size, stride=stride, padding=padding, bias=False), 
-            #nn.InstanceNorm3d(num_features = out_channels),
-            nn.BatchNorm3d(num_features=out_channels),
-            nn.LeakyReLU(),
+            nn.InstanceNorm3d(num_features = out_channels),
+            #nn.BatchNorm3d(num_features=out_channels),
+            nn.SiLU(),
         ]
         for _ in range(max(n_conv-1,0)):
             layers.append(nn.Conv3d(in_channels=out_channels, out_channels=out_channels,
                     kernel_size=kernel_size, stride=stride, padding=padding, bias=False))
-            #layers.append(nn.InstanceNorm3d(num_features=out_channels))
-            layers.append(nn.BatchNorm3d(num_features=out_channels))
-            layers.append(nn.LeakyReLU())
+            layers.append(nn.InstanceNorm3d(num_features=out_channels))
+            #layers.append(nn.BatchNorm3d(num_features=out_channels))
+            layers.append(nn.SiLU())
 
         self.net = nn.Sequential(*layers)
 

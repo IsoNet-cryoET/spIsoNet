@@ -249,9 +249,11 @@ class ISONET:
         if ref_map not in ['None',None]:
             logging.info(f"Incoorporating low resolution information of the reference {ref_map}\n\
                          until the --ref_resolution {ref_resolution}")
+            with mrcfile.open(ref_map,'r') as mrc:
+                reference = mrc.data
             from spIsoNet.util.FSC import combine_map_F
-            halfmap1 = combine_map_F(ref_map,halfmap1,ref_resolution,voxel_size,mask_data=mask)
-            halfmap2 = combine_map_F(ref_map,halfmap2,ref_resolution,voxel_size,mask_data=mask)
+            halfmap1 = combine_map_F(reference,halfmap1,ref_resolution,voxel_size,mask_data=mask_vol)
+            halfmap2 = combine_map_F(reference,halfmap2,ref_resolution,voxel_size,mask_data=mask_vol)
             
         map_refine_n2n(halfmap1,halfmap2, mask_vol, fsc3d, alpha = alpha,beta=beta,  voxel_size=voxel_size, output_dir=output_dir, 
                    output_base1=output_base1, output_base2=output_base2, mixed_precision=mixed_precision, epochs = epochs,
@@ -259,8 +261,8 @@ class ISONET:
                    batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size,gpuID=gpuID, learning_rate=learning_rate, limit_res= limit_res)
         if limit_res is not None:
             logging.info("combining")
-            self.combine_map(f"{output_dir}/corrected_{output_base1}_filtered.mrc",h1, out_map=f"{output_dir}/corrected_{output_base1}.mrc",limit_res=limit_res,mask_file= mask)
-            self.combine_map(f"{output_dir}/corrected_{output_base2}_filtered.mrc",h2, out_map=f"{output_dir}/corrected_{output_base2}.mrc",limit_res=limit_res,mask_file= mask)
+            self.combine_map(f"{output_dir}/corrected_{output_base1}_filtered.mrc",h1, out_map=f"{output_dir}/corrected_{output_base1}.mrc",threshold_res=limit_res,mask_file= mask)
+            self.combine_map(f"{output_dir}/corrected_{output_base2}_filtered.mrc",h2, out_map=f"{output_dir}/corrected_{output_base2}.mrc",threshold_res=limit_res,mask_file= mask)
 
         logging.info("Finished")
 
@@ -347,10 +349,13 @@ class ISONET:
 
         with mrcfile.open(high_map,'r') as mrc:
             high_data = mrc.data
-
-        with mrcfile.open(mask_file,'r') as mrc:
-            mask = mrc.data
-    
+        
+        if mask_file is not None:
+            with mrcfile.open(mask_file,'r') as mrc:
+                mask = mrc.data
+        else:
+            mask = np.ones_like(high_data)
+            
         from spIsoNet.util.FSC import combine_map_F
         out_data = combine_map_F(low_data, high_data, threshold_res, voxel_size, mask_data=mask)
 

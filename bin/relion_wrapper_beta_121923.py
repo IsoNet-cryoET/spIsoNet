@@ -235,7 +235,7 @@ if __name__=="__main__":
     whitening = parse_env("ISONET_WHITENING", "bool", True, silence)
     whitening_low = parse_env("ISONET_WHITENING_LOW", "float", 10, silence)
     retrain = parse_env("ISONET_RETRAIN_EACH_ITER", "bool", True, silence)
-    beta = parse_env("ISONET_BETA", "float", 0.4, silence)
+    beta = parse_env("ISONET_BETA", "float", 0.5, silence)
     alpha = parse_env("ISONET_ALPHA", "float", 1, silence)
     
     limit_healpix = parse_env("ISONET_START_HEALPIX", "int", 3, silence)
@@ -245,7 +245,7 @@ if __name__=="__main__":
     combine = parse_env("ISONET_COMBINE", "bool", False, silence)
     lowpass = parse_env("ISONET_LOWPASS", "bool", True, silence)
 
-    awhiten = parse_env("ISONET_ANGULAR_WHITEN", "bool", True, silence)    
+    awhiten = parse_env("ISONET_ANGULAR_WHITEN", "bool", False, silence)    
     use_3dfsd = parse_env("ISONET_3DFSD", "bool", False, silence)    
     use_fsc_05 = parse_env("ISONET_FSC_05", "bool", False, silence)    
     do_fsc_weighting = parse_env("ISONET_FSC_WEIGHTING", "bool", True, silence)   

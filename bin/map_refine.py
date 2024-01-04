@@ -290,7 +290,7 @@ def map_refine_n2n(halfmap1, halfmap2, mask, fsc3d, alpha, beta, voxel_size, epo
     for count in range(len(output_base1)):
         if output_base1[count] == output_base2[count]:
             output_base0 += output_base1[count]
-    print(output_base0)
+    #print(output_base0)
 
     # from spIsoNet.util.FSC import get_rayFSC
     #fsc3d_cube = rescale_fsc(fsc3d, threshold, crop_size)
