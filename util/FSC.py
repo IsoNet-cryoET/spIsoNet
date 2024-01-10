@@ -139,7 +139,6 @@ def match_spectrum(target_map,source_map, mask = None):
     out_map =  np.real(out_map).astype(np.float32)
     return out_map
 
-
 def get_rayFSC(data, limit_r, n_sampling= 3, preserve_prec = 50):
     if preserve_prec < 5:
         return np.ones(data.shape, dtype =np.float32)
@@ -227,7 +226,6 @@ def rotational_average(input_map):
     for i in range(nz//2):
         FSC_curve[i] = np.average(input_map[index==i])
     return FSC_curve
-
 
 def calculate_FSC(pixels_T, FSC_values, point_tree, r0):
     values = np.zeros(len(pixels_T[0]))
@@ -334,17 +332,11 @@ def fsc_matching(h_target, h_source, fsc3d, low_r, high_r):
 
     return in_donut + out_donut
 
-def angular_whitening(in_name,out_name,resolution_initial, limit_resolution):
-    import mrcfile
+def angular_whitening(in_map, voxel_size,resolution_initial, limit_resolution):
     from numpy.fft import fftn,fftshift,ifftn
     from spIsoNet.util.FSC import apply_F_filter
     import numpy as np
     import skimage
-
-
-    with mrcfile.open(in_name) as mrc:
-        in_map = mrc.data.copy()
-        voxel_size = mrc.voxel_size.x
 
     F_map = fftn(in_map)
     shifted_F_map = fftshift(F_map)
@@ -371,7 +363,7 @@ def angular_whitening(in_name,out_name,resolution_initial, limit_resolution):
     normalized_vectors = normalized_vectors.astype(np.float32)
     normalized_matrix = np.matmul(normalized_vectors, np.transpose(normalized_vectors))
 
-    half_angle_rad = np.radians(20)
+    half_angle_rad = np.radians(5)
     half_angle_cos = np.cos(half_angle_rad)
     normalized_matrix = (np.abs(normalized_matrix) > half_angle_cos).astype(np.float32)
 
@@ -395,8 +387,4 @@ def angular_whitening(in_name,out_name,resolution_initial, limit_resolution):
     transformed_data =   transformed_data*np.std(in_map) + np.mean(in_map)
     reverse_filter = (out_matrix<0.0000001).astype(int)
     in_map_filtered = apply_F_filter(in_map,reverse_filter)
-    with mrcfile.new(out_name, overwrite=True) as mrc:
-        mrc.set_data((transformed_data+in_map_filtered).astype(np.float32))
-        mrc.voxel_size = tuple([voxel_size]*3) 
-
-
+    return (transformed_data+in_map_filtered).astype(np.float32)

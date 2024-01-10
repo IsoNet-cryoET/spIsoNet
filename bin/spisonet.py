@@ -2,9 +2,8 @@
 import fire
 import logging
 import os, sys, traceback
-from spIsoNet.util.dict2attr import Arg,check_parse,idx2list
+#from spIsoNet.util.dict2attr import check_parse
 from fire import core
-from spIsoNet.util.metadata import MetaData,Label,Item
 
 class ISONET:
     """
@@ -363,8 +362,6 @@ class ISONET:
             mrc.set_data(out_data)
             mrc.voxel_size = voxel_size
         
-
-
     def fsc3d(self, 
                    h: str,
                    h2: str, 
@@ -436,9 +433,7 @@ class ISONET:
         with mrcfile.new(o, overwrite=True) as mrc:
             mrc.set_data(fsc3d.astype(np.float32))
         logging.info("voxel_size {}".format(voxel_size))
-
-         
-         
+  
     def fsd3d(self, 
                    star_file: str, 
                    map_dim: int,
@@ -560,182 +555,18 @@ class ISONET:
             mrc.set_data(out_map)
             mrc.voxel_size = voxel_size
 
-
     def angular_whiten(self, in_name,out_name,resolution_initial, limit_resolution):
         import mrcfile
-        from numpy.fft import fftn,fftshift,ifftn
-        from spIsoNet.util.FSC import apply_F_filter
-        import numpy as np
-        import skimage
-
 
         with mrcfile.open(in_name) as mrc:
             in_map = mrc.data.copy()
             voxel_size = mrc.voxel_size.x
 
-        F_map = fftn(in_map)
-        shifted_F_map = fftshift(F_map)
-        F_power = np.real(np.multiply(shifted_F_map,np.conj(shifted_F_map)))**0.5
-        F_power = F_power.astype(np.float32)
-        nz = 64
-        downsampled_F_map = skimage.transform.resize(F_power, [nz,nz,nz])
-
-        low_r = nz * voxel_size / resolution_initial
-        high_r = nz * voxel_size / limit_resolution
-        print(low_r)
-        print(high_r)
-
-        x, y, z = np.meshgrid(np.arange(nz), np.arange(nz), np.arange(nz))
-
-        direction_vectors = np.stack([x - nz // 2, y - nz // 2, z - nz // 2], axis=-1)
-        direction_vectors = direction_vectors.reshape((nz**3,3))
-
-        d = np.linalg.norm(direction_vectors, axis=-1)
-        condition = np.logical_and((d > low_r), (d < high_r))
-
-        distances = d[condition]
-        direction_vectors = direction_vectors[condition]
-
-        normalized_vectors = direction_vectors / distances[:,np.newaxis]
-        normalized_vectors = normalized_vectors.astype(np.float32)
-        normalized_matrix = np.matmul(normalized_vectors, np.transpose(normalized_vectors))
-
-        half_angle_rad = np.radians(5)
-        half_angle_cos = np.cos(half_angle_rad)
-        normalized_matrix = (np.abs(normalized_matrix) > half_angle_cos).astype(np.float32)
-
-        sum_matrix = np.sum(normalized_matrix, axis = -1)
-
-        input_flatterned_matrix = downsampled_F_map.reshape((nz**3,1))[condition]
-
-        out_values = np.matmul(normalized_matrix, input_flatterned_matrix).squeeze()/sum_matrix
-
-        out_matrix = np.zeros((nz**3,), dtype = np.float32)
-        out_matrix[condition] = 1/out_values
-        #out_matrix[d<=low_r] = np.max(out_matrix[d<=(low_r+1)])
-        out_matrix = out_matrix.reshape((nz,nz,nz))
-        # with mrcfile.new("tmp.mrc", overwrite=True) as mrc:
-        #     mrc.set_data(out_matrix.astype(np.float32))
-        map_dim = in_map.shape[0]
-        out_matrix = skimage.transform.resize(out_matrix, [map_dim,map_dim,map_dim])
-
-        # with mrcfile.new("tmp.mrc", overwrite=True) as mrc:
-        #     mrc.set_data(out_matrix.astype(np.float32))
-
-        transformed_data = np.real(ifftn(F_map*fftshift(out_matrix))).astype(np.float32)
-        transformed_data =  (transformed_data-np.mean(transformed_data))/np.std(transformed_data)
-        transformed_data =   transformed_data*np.std(in_map) + np.mean(in_map)
-        reverse_filter = (out_matrix<0.0000001).astype(int)
-        in_map_filtered = apply_F_filter(in_map,reverse_filter)
+        from spIsoNet.util.FSC import angular_whitening
+        out_map = angular_whitening(in_map,voxel_size,resolution_initial,limit_resolution)
         with mrcfile.new(out_name, overwrite=True) as mrc:
-            mrc.set_data((transformed_data+in_map_filtered).astype(np.float32))
+            mrc.set_data(out_map)
             mrc.voxel_size = tuple([voxel_size]*3) 
-
-    '''
-    def map_refine_multi(self, half1_file, half2_file, mask_file, fsc_file, limit_res, output_dir="isonet_maps", gpuID=0, n_subvolume=50, crop_size=96, cube_size=64, weighting=False):
-        logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
-            ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])
-        half1_list = half1_file.split(',')
-        print(half1_list)
-        half2_list = half2_file.split(',')
-        mask_list = mask_file.split(',')
-        import mrcfile
-        half1 = []
-        half2 = []
-        mask = []
-        for half1_file in half1_list:
-            with mrcfile.open(half1_file, 'r') as mrc:
-                half1.append(mrc.data)
-                voxel_size = mrc.voxel_size.x
-        for half2_file in half2_list:
-            with mrcfile.open(half2_file, 'r') as mrc:
-                half2.append(mrc.data)
-        for mask_file in mask_list:
-            with mrcfile.open(mask_file, 'r') as mrc:
-                mask.append(mrc.data)
-        with mrcfile.open(fsc_file, 'r') as mrc:
-            fsc3d = mrc.data
-        logging.info("voxel_size {}".format(voxel_size))
-        from spIsoNet.bin.map_refine import map_refine_multi
-        from spIsoNet.util.utils import mkfolder
-        mkfolder(output_dir)
-        logging.info("processing half map1")
-        map_refine_multi(half1, mask, fsc3d, voxel_size=voxel_size, limit_res = limit_res, output_dir = output_dir, output_base="half1", weighting = weighting, n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size)
-        logging.info("processing half map2")
-        map_refine_multi(half2, mask, fsc3d, voxel_size=voxel_size, limit_res = limit_res, output_dir = output_dir, output_base="half2", weighting = weighting, n_subvolume = n_subvolume, cube_size = cube_size, crop_size = crop_size)
-        logging.info("Two independent half maps are saved in {}. Please use other software for postprocessing and try difference B factors".format(output_dir))
-    '''
-
-    # def predict(self, star_file: str, model: str, output_dir: str='./corrected_tomos', gpuID: str = None, cube_size:int=64,
-    # crop_size:int=96,use_deconv_tomo=True, batch_size:int=None,normalize_percentile: bool=True,log_level: str="info", tomo_idx=None):
-    #     """
-    #     \nPredict tomograms using trained model\n
-    #     spisonet.py predict star_file model [--gpuID] [--output_dir] [--cube_size] [--crop_size] [--batch_size] [--tomo_idx]
-    #     :param star_file: star for tomograms.
-    #     :param output_dir: file_name of output predicted tomograms
-    #     :param model: path to trained network model .h5
-    #     :param gpuID: (0,1,2,3) The gpuID to used during the training. e.g 0,1,2,3.
-    #     :param cube_size: (64) The tomogram is divided into cubes to predict due to the memory limitation of GPUs.
-    #     :param crop_size: (96) The side-length of cubes cropping from tomogram in an overlapping patch strategy, make this value larger if you see the patchy artifacts
-    #     :param batch_size: The batch size of the cubes grouped into for network predicting, the default parameter is four times number of gpu
-    #     :param normalize_percentile: (True) if normalize the tomograms by percentile. Should be the same with that in refine parameter.
-    #     :param log_level: ("debug") level of message to be displayed, could be 'info' or 'debug'
-    #     :param tomo_idx: (None) If this value is set, process only the tomograms listed in this index. e.g. 1,2,4 or 5-10,15,16
-    #     :param use_deconv_tomo: (True) If CTF deconvolved tomogram is found in tomogram.star, use that tomogram instead.
-    #     :raises: AttributeError, KeyError
-    #     """
-    #     d = locals()
-    #     d_args = Arg(d)
-    #     from spIsoNet.bin.predict import predict
-
-    #     if d_args.log_level == "debug":
-    #         logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',
-    #         datefmt="%m-%d %H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])
-    #     else:
-    #         logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',
-    #         datefmt="%m-%d %H:%M:%S",level=logging.INFO,handlers=[logging.StreamHandler(sys.stdout)])
-    #     try:
-    #         predict(d_args)
-    #     except:
-    #         error_text = traceback.format_exc()
-    #         f =open('log.txt','a+')
-    #         f.write(error_text)
-    #         f.close()
-    #         logging.error(error_text)
-    
-    # def resize(self, star_file:str, apix: float=15, out_folder="tomograms_resized"):
-    #     '''
-    #     This function rescale the tomograms to a given pixelsize
-    #     '''
-    #     md = MetaData()
-    #     md.read(star_file)
-        
-    #     from scipy.ndimage import zoom
-    #     import mrcfile
-    #     if not os.path.isdir(out_folder):
-    #         os.makedirs(out_folder)
-    #     for item in md._data:
-    #         ori_apix = item.rlnPixelSize
-    #         tomo_name = item.rlnMicrographName
-    #         zoom_factor = float(ori_apix)/apix
-    #         new_tomo_name = "{}/{}".format(out_folder,os.path.basename(tomo_name))
-    #         with mrcfile.open(tomo_name) as mrc:
-    #             data = mrc.data
-    #         print("scaling: {}".format(tomo_name))
-    #         new_data = zoom(data, zoom_factor,order=3, prefilter=False)
-    #         #new_data = rescale(data, zoom_factor,order=3, anti_aliasing = True)
-    #         #new_data = new_data.astype(np.float32)
-
-    #         with mrcfile.new(new_tomo_name,overwrite=True) as mrc:
-    #             mrc.set_data(new_data)
-    #             mrc.voxel_size = apix
-
-    #         item.rlnPixelSize = apix
-    #         print(new_tomo_name)
-    #         item.rlnMicrographName = new_tomo_name
-    #         print(item.rlnMicrographName)
-    #     md.write(os.path.splitext(star_file)[0] + "_resized.star")
-    #     print("scale_finished")
 
     def check(self):
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',
@@ -774,8 +605,8 @@ def pool_process(p_func,chunks_list,ncpu):
 def main():
     core.Display = Display
     # logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',datefmt="%m-%d %H:%M:%S",level=logging.INFO)
-    if len(sys.argv) > 1:
-        check_parse(sys.argv[1:])
+    #if len(sys.argv) > 1:
+    #    check_parse(sys.argv[1:])
     fire.Fire(ISONET)
 
 
