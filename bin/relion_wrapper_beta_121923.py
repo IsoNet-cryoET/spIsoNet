@@ -240,8 +240,8 @@ if __name__=="__main__":
     
     limit_healpix = parse_env("ISONET_START_HEALPIX", "int", 3, silence)
     acc_batches = parse_env("ISONET_ACC_BATCHES", "int", 2, silence)
-    epochs = parse_env("ISONET_EPOCHS", "int", 10, silence)
-    start_epochs = parse_env("ISONET_START_EPOCHS", "int", 10, silence)
+    epochs = parse_env("ISONET_EPOCHS", "int", 5, silence)
+    start_epochs = parse_env("ISONET_START_EPOCHS", "int", 5, silence)
     combine = parse_env("ISONET_COMBINE", "bool", False, silence)
     lowpass = parse_env("ISONET_LOWPASS", "bool", True, silence)
 
@@ -466,7 +466,7 @@ if __name__=="__main__":
                 refine_limit_res = limit_resolution_05
             else:
                 refine_limit_res = limit_resolution
-            execute_deep(mrc1_unfil, mrc2_unfil, fscn, dir,  gpu, refine_limit_res, epochs = epochs, mask_file = None, pretrained_model = model, batch_size = None, acc_batches=acc_batches, alpha=alpha, beta=beta)
+            execute_deep(mrc1_unfil, mrc2_unfil, fscn, dir,  gpu, refine_limit_res, epochs = epochs, mask_file = mask_file, pretrained_model = model, batch_size = None, acc_batches=acc_batches, alpha=alpha, beta=beta)
 
             if awhiten:
                 mrc_correct_backup1 = '%s/corrected_%s_it%s_half1_class001_unfil_backup.mrc' %(dir,basename,var)
