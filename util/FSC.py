@@ -9,6 +9,28 @@ import numpy as np
 from scipy.spatial import cKDTree
 from skimage.transform import resize
 
+def cutoff_vol(map, voxel_size, limit_res):
+    crop_size = map.shape[0]
+    half_size = crop_size//2
+    limit_r = ((2*voxel_size)/limit_res) * half_size
+
+    fsc3d = np.zeros(map.shape,dtype = np.float32)
+    r = np.arange(crop_size)-half_size
+    [Z,Y,X] = np.meshgrid(r,r,r)
+    index = np.round(np.sqrt(Z**2+Y**2+X**2))
+
+    smooth_limit = True
+    if smooth_limit:
+        d =  index - limit_r
+        sigmoid = 1.0/(1.0+np.exp(-d))
+        #sigmoid[sigmoid<1.0/(1.0+np.exp(-9))] = 0
+        fsc3d = np.maximum(sigmoid.astype(np.float32), fsc3d)
+    else:
+        fsc3d[index > limit_r] = 1
+    fsc3d = 1- fsc3d
+    fsc3d[half_size,half_size,half_size] = 1
+    return fsc3d
+
 def calculate_resolution(half1_file, half2_file, mask_file=None, voxel_size=1, threshold=0.143):
     with mrcfile.open(half1_file) as mrc:
         h1 = mrc.data

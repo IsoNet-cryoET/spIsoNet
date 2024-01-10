@@ -17,128 +17,23 @@ class ISONET:
 
 
     def refine(self, 
-                   input: str,
+                   i1: str,
+                   i2: str=None,
+                   independent: bool=False,
                    aniso_file: str = None, 
+
                    mask: str=None, 
+                   gpuID: str=None,
 
-                   gpuID: str=None, 
-                   alpha: float=1,
-                   ncpus: int=16, 
-                   output_dir: str="isonet_maps",
-                   pretrained_model: str=None,
-
-                   epochs: int=50,
-                   n_subvolume: int=1000, 
-                   cube_size: int=64,
-                   predict_crop_size: int=80,
-                   batch_size: int=None, 
-                   acc_batches: int=1,
-                   learning_rate: float=3e-4
-                   ):
-
-        """
-        \ntrain neural network to correct preffered orientation\n
-        spisonet.py map_refine half.mrc FSC3D.mrc mask.mrc [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
-        :param input: Input name
-        :param mask: Filename of a user-provided mask
-        :param gpuID: The ID of gpu to be used during the training.
-        :param ncpus: Number of cpu.
-        :param output_dir: The name of directory to save output maps
-        :param fsc_file: 3DFSC file if not set, isonet will generate one.
-        :param epochs: Number of epochs for each iteration. This value can be increase (maybe to 10) to get (maybe) better result.
-        :param n_subvolume: Number of subvolumes 
-        :param predict_crop_size: The size of subvolumes, should be larger then the cube_size
-        :param cube_size: Size of cubes for training, should be divisible by 16, e.g. 32, 64, 80.
-        :param batch_size: Size of the minibatch. If None, batch_size will be the max(2 * number_of_gpu,4). batch_size should be divisible by the number of gpu.
-        :param acc_batches: If this value is set to 2 (or more), accumulate gradiant will be used to save memory consumption.  
-        :param learning_rate: learning rate. Default learning rate is 3e-4 while previous spIsoNet tomography used 3e-4 as learning rate
-        """
-        #TODO
-        #mixed precision does not work for torch.FFT
-        mixed_precision = False
-
-        from spIsoNet.util.utils import mkfolder
-        from spIsoNet.preprocessing.img_processing import normalize
-        from spIsoNet.bin.map_refine import map_refine
-        from spIsoNet.util.utils import process_gpuID
-        from multiprocessing import cpu_count
-        import mrcfile
-        import numpy as np
-
-        logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
-            ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])   
-        
-        if gpuID is None:
-            import torch
-            gpu_list = list(range(torch.cuda.device_count()))
-            gpuID=','.join(map(str, gpu_list))
-            print("using all GPUs in this node: %s" %gpuID)  
-
-        ngpus, gpuID, gpuID_list = process_gpuID(gpuID)
-
-        os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-        os.environ["CUDA_VISIBLE_DEVICES"]=gpuID
-
-        if batch_size is None:
-            if ngpus == 1:
-                batch_size = 4
-            else:
-                batch_size = 2 * len(gpuID_list)
-
-        cpu_system = cpu_count()
-        if cpu_system < ncpus:
-            logging.info("requested number of cpus is more than the number of the cpu cores in the system")
-            logging.info(f"setting ncpus to {cpu_system}")
-            ncpus = cpu_system
-
-        mkfolder(output_dir,remove=False)
-
-        output_base = input.split('/')[-1]
-        output_base = output_base.split('.')[:-1]
-        output_base = "".join(output_base)
-
-        with mrcfile.open(input, 'r') as mrc:
-            half_map = normalize(mrc.data,percentile=False)
-            voxel_size = mrc.voxel_size.x
-            if voxel_size == 0:
-                voxel_size = 1
-        logging.info("voxel_size {}".format(voxel_size))
-
-        if mask is None:
-            mask_vol = np.ones(half_map.shape, dtype = np.float32)
-            logging.warning("No mask is provided, please consider providing a soft mask")
-        else:
-            with mrcfile.open(mask, 'r') as mrc:
-                mask_vol = mrc.data
-        if aniso_file is None:
-            logging.warning("No fsc3d is provided. Only denoising")
-            fsc3d = np.ones(half_map.shape, dtype = np.float32)
-        else:
-            with mrcfile.open(aniso_file, 'r') as mrc:
-                fsc3d = mrc.data
-
-        map_refine(half_map, mask_vol, fsc3d, alpha = alpha,  voxel_size=voxel_size, output_dir=output_dir, 
-                   output_base=output_base, mixed_precision=mixed_precision, epochs = epochs,
-                   n_subvolume=n_subvolume, cube_size=cube_size, pretrained_model=pretrained_model,
-                   batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size,gpuID=gpuID, learning_rate=learning_rate)
-        
-        logging.info("Finished")
-
-    def refine_n2n(self, 
-                   h1: str,
-                   h2: str,
-                   aniso_file: str = None, 
-                   mask: str=None, 
-
-                   gpuID: str=None, 
                    alpha: float=1,
                    beta: float=0.5,
+                   limit_res: str=None,
+
                    ncpus: int=16, 
                    output_dir: str="isonet_maps",
                    pretrained_model: str=None,
-                   limit_res: str="None",
 
-                   ref_map: str="None",
+                   ref_map: str=None,
                    ref_resolution: float=10,
 
                    epochs: int=50,
@@ -146,7 +41,7 @@ class ISONET:
                    cube_size: int=64,
                    predict_crop_size: int=80,
                    batch_size: int=None, 
-                   acc_batches: int=1,
+                   acc_batches: int=2,
                    learning_rate: float=3e-4
                    ):
 
@@ -167,14 +62,10 @@ class ISONET:
         :param acc_batches: If this value is set to 2 (or more), accumulate gradiant will be used to save memory consumption.  
         :param learning_rate: learning rate. Default learning rate is 3e-4 while previous spIsoNet tomography used 3e-4 as learning rate
         """
-        #TODO
-        #mixed precision does not work for torch.FFT
-        mixed_precision = False
 
-        from spIsoNet.util.utils import mkfolder
         from spIsoNet.preprocessing.img_processing import normalize
-        from spIsoNet.bin.map_refine import map_refine_n2n
-        from spIsoNet.util.utils import process_gpuID
+        from spIsoNet.bin.map_refine import map_refine, map_refine_n2n
+        from spIsoNet.util.utils import process_gpuID, mkfolder
         from multiprocessing import cpu_count
         import mrcfile
         import numpy as np
@@ -182,6 +73,7 @@ class ISONET:
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
             ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])   
         
+        #GPU
         if gpuID is None:
             import torch
             gpu_list = list(range(torch.cuda.device_count()))
@@ -199,6 +91,7 @@ class ISONET:
             else:
                 batch_size = 2 * len(gpuID_list)
 
+        #CPU
         cpu_system = cpu_count()
         if cpu_system < ncpus:
             logging.info("requested number of cpus is more than the number of the cpu cores in the system")
@@ -207,61 +100,81 @@ class ISONET:
 
         mkfolder(output_dir,remove=False)
 
-        output_base1 = h1.split('/')[-1]
+        # loading i1
+        output_base1 = i1.split('/')[-1]
         output_base1 = output_base1.split('.')[:-1]
         output_base1 = "".join(output_base1)
 
-        output_base2 = h2.split('/')[-1]
-        output_base2 = output_base2.split('.')[:-1]
-        output_base2 = "".join(output_base2)
-
-        with mrcfile.open(h1, 'r') as mrc:
+        with mrcfile.open(i1, 'r') as mrc:
             halfmap1 = normalize(mrc.data,percentile=False)
             voxel_size = mrc.voxel_size.x
             if voxel_size == 0:
                 voxel_size = 1
-        with mrcfile.open(h2, 'r') as mrc:
-            halfmap2 = normalize(mrc.data,percentile=False)
-
         logging.info("voxel_size {}".format(voxel_size))
 
+        # loading i2
+        if i2 is not None:
+            output_base2 = i2.split('/')[-1]
+            output_base2 = output_base2.split('.')[:-1]
+            output_base2 = "".join(output_base2)
+            with mrcfile.open(i2, 'r') as mrc:
+                halfmap2 = normalize(mrc.data,percentile=False)
+
+        # loading mask
         if mask is None:
             mask_vol = np.ones(halfmap1.shape, dtype = np.float32)
-            logging.warning("No mask is provided, please consider providing a soft mask")
+            logging.info("No mask is provided. Sometimes without mask is better")
         else:
             with mrcfile.open(mask, 'r') as mrc:
                 mask_vol = mrc.data
 
+        # loading fsc3d
         if aniso_file is None:
-            logging.warning("No fsc3d is provided. Only denoising")
+            logging.warning("No fsc3d is provided. Only denosing")
+            if (i2 is None) or independent:
+                logging.warning("For denoising, please provide half2 and set independent to False")
             fsc3d = np.ones(halfmap1.shape, dtype = np.float32)
         else:
             with mrcfile.open(aniso_file, 'r') as mrc:
                 fsc3d = mrc.data
 
-        if limit_res in ["None", None]:
-            #from spIsoNet.util.FSC import recommended_resolution
-            limit_res = None #recommended_resolution(fsc3d, voxel_size, threshold = 0.143)
-        else:
+        if limit_res is not None:
             limit_res = float(limit_res)
-
-        if ref_map not in ['None',None]:
+        
+        if ref_map is not None:
+            # TODO change the FSC3D 
             logging.info(f"Incoorporating low resolution information of the reference {ref_map}\n\
                          until the --ref_resolution {ref_resolution}")
             with mrcfile.open(ref_map,'r') as mrc:
                 reference = mrc.data
             from spIsoNet.util.FSC import combine_map_F
             halfmap1 = combine_map_F(reference,halfmap1,ref_resolution,voxel_size,mask_data=mask_vol)
-            halfmap2 = combine_map_F(reference,halfmap2,ref_resolution,voxel_size,mask_data=mask_vol)
-            
-        map_refine_n2n(halfmap1,halfmap2, mask_vol, fsc3d, alpha = alpha,beta=beta,  voxel_size=voxel_size, output_dir=output_dir, 
-                   output_base1=output_base1, output_base2=output_base2, mixed_precision=mixed_precision, epochs = epochs,
+            if i2 is not None:
+                halfmap2 = combine_map_F(reference,halfmap2,ref_resolution,voxel_size,mask_data=mask_vol)
+
+        if independent:
+            logging.info("processing half1")
+            map_refine(halfmap1, mask_vol, fsc3d, alpha = alpha,  voxel_size=voxel_size, output_dir=output_dir, 
+                   output_base=output_base1, mixed_precision=False, epochs = epochs,
                    n_subvolume=n_subvolume, cube_size=cube_size, pretrained_model=pretrained_model,
-                   batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size,gpuID=gpuID, learning_rate=learning_rate, limit_res= limit_res)
+                   batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size, learning_rate=learning_rate, limit_res= limit_res)
+        if (i2 is not None) and independent:
+            logging.info("processing half2")
+            map_refine(halfmap1, mask_vol, fsc3d, alpha = alpha,  voxel_size=voxel_size, output_dir=output_dir, 
+                   output_base=output_base2, mixed_precision=False, epochs = epochs,
+                   n_subvolume=n_subvolume, cube_size=cube_size, pretrained_model=pretrained_model,
+                   batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size,learning_rate=learning_rate, limit_res= limit_res)
+        if (i2 is not None) and (not independent):
+            map_refine_n2n(halfmap1,halfmap2, mask_vol, fsc3d, alpha = alpha,beta=beta,  voxel_size=voxel_size, output_dir=output_dir, 
+                   output_base1=output_base1, output_base2=output_base2, mixed_precision=False, epochs = epochs,
+                   n_subvolume=n_subvolume, cube_size=cube_size, pretrained_model=pretrained_model,
+                   batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size, learning_rate=learning_rate, limit_res= limit_res)
+
         if limit_res is not None:
             logging.info("combining")
-            self.combine_map(f"{output_dir}/corrected_{output_base1}_filtered.mrc",h1, out_map=f"{output_dir}/corrected_{output_base1}.mrc",threshold_res=limit_res,mask_file= mask)
-            self.combine_map(f"{output_dir}/corrected_{output_base2}_filtered.mrc",h2, out_map=f"{output_dir}/corrected_{output_base2}.mrc",threshold_res=limit_res,mask_file= mask)
+            self.combine_map(f"{output_dir}/corrected_{output_base1}_filtered.mrc",i1, out_map=f"{output_dir}/corrected_{output_base1}.mrc",threshold_res=limit_res,mask_file= mask)
+            if i2 is not None:
+                self.combine_map(f"{output_dir}/corrected_{output_base2}_filtered.mrc",i2, out_map=f"{output_dir}/corrected_{output_base2}.mrc",threshold_res=limit_res,mask_file= mask)
 
         logging.info("Finished")
 
