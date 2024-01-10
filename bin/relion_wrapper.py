@@ -32,7 +32,7 @@ def execute_external_relion(star):
 def execute_deep(mrc1, mrc2, fsc3d, dir, gpu, limit_res, epochs = 1, mask_file = None, pretrained_model=None, alpha = None, acc_batches= None, batch_size = None, beta=None): 
     #data_file =  ' %s/%s_it%s_half%s_class001_external_reconstruct.mrc' %(dir, basename, var, half)   
     params = ' eval "$(conda shell.bash hook)" && conda activate %s && ' %CONDA_ENV     
-    params += ' spisonet.py refine_n2n '
+    params += ' spisonet.py refine '
     params += f" {mrc1} {mrc2}"      
     params += ' %s' %(fsc3d) 
     params += ' --epochs %s --n_subvolume 1000'   %(epochs)

@@ -33,7 +33,7 @@ class ISONET:
                    output_dir: str="isonet_maps",
                    pretrained_model: str=None,
 
-                   ref_map: str=None,
+                   reference: str=None,
                    ref_resolution: float=10,
 
                    epochs: int=50,
@@ -123,7 +123,7 @@ class ISONET:
         # loading mask
         if mask is None:
             mask_vol = np.ones(halfmap1.shape, dtype = np.float32)
-            logging.info("No mask is provided. Sometimes without mask is better")
+            logging.info("No mask is provided. Maybe without mask is better")
         else:
             with mrcfile.open(mask, 'r') as mrc:
                 mask_vol = mrc.data
@@ -141,16 +141,22 @@ class ISONET:
         if limit_res is not None:
             limit_res = float(limit_res)
         
-        if ref_map is not None:
+        if reference is not None:
             # TODO change the FSC3D 
-            logging.info(f"Incoorporating low resolution information of the reference {ref_map}\n\
+            logging.info(f"Incoorporating low resolution information of the reference {reference}\n\
                          until the --ref_resolution {ref_resolution}")
-            with mrcfile.open(ref_map,'r') as mrc:
-                reference = mrc.data
+            with mrcfile.open(reference,'r') as mrc:
+                ref_map = mrc.data
             from spIsoNet.util.FSC import combine_map_F
-            halfmap1 = combine_map_F(reference,halfmap1,ref_resolution,voxel_size,mask_data=mask_vol)
+            halfmap1 = combine_map_F(ref_map,halfmap1,ref_resolution,voxel_size,mask_data=mask_vol)
             if i2 is not None:
-                halfmap2 = combine_map_F(reference,halfmap2,ref_resolution,voxel_size,mask_data=mask_vol)
+                halfmap2 = combine_map_F(ref_map,halfmap2,ref_resolution,voxel_size,mask_data=mask_vol)
+
+            from spIsoNet.util.FSC import get_sphere
+            sphere = get_sphere(voxel_size/float(ref_resolution)*fsc3d.shape[0], fsc3d.shape[0])
+            fsc3d = np.maximum(fsc3d, sphere)
+            # with mrcfile.new("tmp_combined_FSC.mrc", overwrite=True) as mrc:
+            #     mrc.set_data(fsc3d.astype(np.float32))
 
         if independent:
             logging.info("processing half1")
@@ -497,12 +503,12 @@ class ISONET:
         logging.info(f"time for mixed/half precsion and single precision are {fp16} and {fp32}. ")
         logging.info(f"The first number should be much smaller than the second one, if not please check whether cudnn, cuda, and pytorch versions match.")
 
-    def gui(self):
-        """
-        \nGraphic User Interface\n
-        """
-        import spIsoNet.gui.Isonet_star_app as app
-        app.main()
+    # def gui(self):
+    #     """
+    #     \nGraphic User Interface\n
+    #     """
+    #     import spIsoNet.gui.Isonet_star_app as app
+    #     app.main()
 
 def Display(lines, out):
     text = "\n".join(lines) + "\n"
