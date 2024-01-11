@@ -2,14 +2,13 @@
 import fire
 import logging
 import os, sys, traceback
-#from spIsoNet.util.dict2attr import check_parse
+from spIsoNet.util.dict2attr import check_parse
 from fire import core
 
 class ISONET:
     """
     ISONET: Train on tomograms and restore missing-wedge\n
     for detail discription, run one of the following commands:
-
 
     spisonet.py fsc3d -h
     spisonet.py map_refine -h
@@ -523,9 +522,9 @@ def pool_process(p_func,chunks_list,ncpu):
 
 def main():
     core.Display = Display
-    # logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',datefmt="%m-%d %H:%M:%S",level=logging.INFO)
-    #if len(sys.argv) > 1:
-    #    check_parse(sys.argv[1:])
+    logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',datefmt="%m-%d %H:%M:%S",level=logging.INFO)
+    if len(sys.argv) > 1:
+       check_parse(sys.argv[1:])
     fire.Fire(ISONET)
 
 
