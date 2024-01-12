@@ -19,7 +19,8 @@ import torch.multiprocessing as mp
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
-import time
+import torch.nn.functional as F
+from spIsoNet.util.rotations import random_rot_mat
 #import torch._dynamo as dynamo
 def find_unused_port():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -108,21 +109,8 @@ def ddp_train(rank, world_size, port_number, model,alpha, beta, data_path, batch
                         loss = loss / acc_batches
                     scaler.scale(loss).backward()
                 else:
-                    #noise_level = 4
-                    #if rank == 0:
-                    #    print("noise_level", noise_level)
-                    #noise = torch.rand(1)[0] * noise_level * torch.normal(0, 1, size=x.shape)
+                    preds = model(x1)
 
-                    preds = model(x1)# + noise.cuda())
-                    # no_grad_h2 = False
-                    # if no_grad_h2:
-                    #     with torch.no_grad():
-                    #         pred_2 = model(x2)
-                    #         data_rot_2 = torch.zeros_like(pred_2, requires_grad=False)
-                    # else:
-                    #     pred_2 = model(x2)
-                    #     data_rot_2 = torch.zeros_like(pred_2)    
-                    
                     data = torch.zeros_like(preds)
                     for j,d in enumerate(preds):
                         data[j][0] = torch.real(torch.fft.ifftn(mwshift*torch.fft.fftn(d[0])))#.astype(np.float32)
@@ -136,17 +124,30 @@ def ddp_train(rank, world_size, port_number, model,alpha, beta, data_path, batch
                         loss_consistency_2 = 0
                         beta = 0
 
- 
-
                     data_rot = torch.zeros_like(preds)
                     data_e = torch.zeros_like(preds)
+
+                    old_rotation = False
+                    p_shape = preds.shape
+
                     for k,d in enumerate(preds):
-                        rot = random.choice(rotation_list_24)
-                        tmp = torch.rot90(d[0],rot[0][1],rot[0][0])
-                        data_rot[k][0] = torch.rot90(tmp,rot[1][1],rot[1][0])
+                        if old_rotation:
+                            rot = random.choice(rotation_list_24)
+                            tmp = torch.rot90(d[0],rot[0][1],rot[0][0])
+                            data_rot[k][0] = torch.rot90(tmp,rot[1][1],rot[1][0])
+                        else:
+                            theta = random_rot_mat(expand=True)
+                            theta = torch.Tensor(theta).unsqueeze(0).cuda()
+                            grid = F.affine_grid(theta, (1, 1, p_shape[2], p_shape[3], p_shape[4]), align_corners=False)
+                            data_rot[k][0] = F.grid_sample(d.unsqueeze(0), grid, align_corners=False).squeeze()
+
                         if beta > 0:
-                            tmp_2 = torch.rot90(pred_2[k][0],rot[0][1],rot[0][0])
-                            data_rot_2[k][0] = torch.rot90(tmp_2,rot[1][1],rot[1][0])
+                            if old_rotation:
+                                tmp_2 = torch.rot90(pred_2[k][0],rot[0][1],rot[0][0])
+                                data_rot_2[k][0] = torch.rot90(tmp_2,rot[1][1],rot[1][0])
+                            else:
+                                data_rot_2[k][0] = F.grid_sample(pred_2[k].unsqueeze(0), grid, align_corners=False).squeeze()
+
                         data_e[k][0] = torch.real(torch.fft.ifftn(mwshift*torch.fft.fftn(data_rot[k][0])))#+noise[i][0]#.astype(np.float32)
                     pred_y = model(data_e)
                     if beta > 0:

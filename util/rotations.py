@@ -1,4 +1,39 @@
 
+import numpy as np
+
+def axis_angle_to_rotation_matrix(axis, angle):
+
+    axis = axis / np.linalg.norm(axis)  # Normalize the axis to get a unit vector
+
+    # Skew-symmetric matrix
+    skew_symmetric = np.zeros((3, 3), dtype=np.float32)
+    skew_symmetric[0, 1] = -axis[2]
+    skew_symmetric[0, 2] = axis[1]
+    skew_symmetric[1, 0] = axis[2]
+    skew_symmetric[1, 2] = -axis[0]
+    skew_symmetric[2, 0] = -axis[1]
+    skew_symmetric[2, 1] = axis[0]
+
+    # Rodrigues' rotation formula
+    rotation_matrix = np.eye(3, dtype=np.float32) + \
+                      np.sin(angle) * skew_symmetric + \
+                      (1 - np.cos(angle)) * np.dot(skew_symmetric, skew_symmetric)
+
+    return rotation_matrix
+
+def random_rot_mat(expand=False):
+    axis = np.random.rand(3)
+    angle = np.random.rand(1) * np.pi * 2
+    mat = axis_angle_to_rotation_matrix(axis, angle)
+    if expand:
+        theta = np.zeros((3,4), dtype=np.float32)
+        theta[:,:3] = mat
+        return theta
+    else:
+        return mat
+
+
+
 '''
 rotation_list = {
 

@@ -2,13 +2,10 @@ import logging
 import numpy as np
 from spIsoNet.preprocessing.cubes import create_cube_seeds,crop_cubes
 import mrcfile
-from multiprocessing import Pool
-from functools import partial
 from spIsoNet.util.utils import mkfolder
 import skimage
 from spIsoNet.preprocessing.img_processing import normalize
 import os
-import sys
 from spIsoNet.util.plot_metrics import plot_metrics
 import shutil
        
