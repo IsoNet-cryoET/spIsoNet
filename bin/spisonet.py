@@ -18,8 +18,8 @@ class ISONET:
     def refine(self, 
                    i1: str,
                    i2: str=None,
-                   independent: bool=False,
                    aniso_file: str = None, 
+                   independent: bool=False,
 
                    mask: str=None, 
                    gpuID: str=None,

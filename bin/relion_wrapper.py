@@ -34,7 +34,7 @@ def execute_deep(mrc1, mrc2, fsc3d, dir, gpu, limit_res, epochs = 1, mask_file =
     params = ' eval "$(conda shell.bash hook)" && conda activate %s && ' %CONDA_ENV     
     params += ' spisonet.py refine '
     params += f" {mrc1} {mrc2}"      
-    params += ' %s' %(fsc3d) 
+    params += ' --aniso_file %s' %(fsc3d) 
     params += ' --epochs %s --n_subvolume 1000'   %(epochs)
     if acc_batches is not None:
         params += ' --acc_batches %s'   %(acc_batches) 
