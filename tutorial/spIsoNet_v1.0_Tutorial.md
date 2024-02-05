@@ -1,6 +1,6 @@
 # Single Particle spIsoNet Tutorial
 
-Single Particle spIsoNet (spspIsoNet) is designed to correct the preffered orientation effect by self-supervised learning. It iteratively reconstruct missing information in in the missing regions in fourier space. The software requires half maps as input.
+Single Particle spIsoNet (spIsoNet) is designed to correct for the preferred orientation problem in cryoEM by self-supervised deep learning, by recovering missing information from well-sampled orientations in Fourier space. Unlike conventional supervised deep learning methods that need explicit input-output pairs for training, spIsoNet autonomously extracts supervisory signals from the original data, ensuring the reliability of the information used for training. The software requires two half maps as input.
 
 
 
@@ -8,17 +8,17 @@ Single Particle spIsoNet (spspIsoNet) is designed to correct the preffered orien
 
 We suggest using anaconda environment to manage the spIsoNet package.
 
-1. install cudatoolkit and cudnn on your computer.
+1. Install cudatoolkit and cudnn on your computer.
 2. Install pytorch from https://pytorch.org/ 
-3. install dependencies using pip install
-   the dependencies include tqdm, matplotlib, scipy, numpy, scikit-image, mrcfile, fire
-4. For example add following lines in your ~/.bashrc
+3. Create an conda virtual environment and install dependencies by running install.sh in the spIsoNet folder or by pip install
+   The dependencies include tqdm, matplotlib, scipy, numpy, scikit-image, mrcfile, fire
+4. For example, add the following lines in your ~/.bashrc
 
     export PATH=PATH_TO_ISONET_FOLDER/bin:$PATH 
 
     export PYTHONPATH=PATH_TO_PARENT_FOLDER_OF_ISONET_FOLDER:$PYTHONPATH 
     or you can run source source-env.sh in your terminal, which will export required variables into your environment.
-5. Now spIsoNet is avaliable to use.
+5. Now spIsoNet is available to use.
 
 The environment we verified are:
 1. cuda11.8 cudnn8.5 pytorch2.0.1, pytorch installed with pip.
@@ -27,31 +27,29 @@ The environment we verified are:
 
 # 2. Quick run
 
-The default parameter in spIsoNet should be suitable for most cases, you can also train with a larger epochs to get better result. 
+The default parameter in spIsoNet should be suitable for most cases. You can also train with larger epoch values to obtain better results. 
 
 ## 2.0 prepare data set
 The tutorial data can be downloaded on google drive: xxx
 The tutorial data set contains a two half maps: emd_8731_half_map_1.mrc and emd_8731_half_map_2.mrc and a solvent mask emd_8731_msk_1.mrc. After you download the files put those into a new folder.
 
-
-
 ## 2.1. make 3D FSC
 
-The algorithum for 3D FSC is based on
+The algorithm for 3D FSC is based on
 Tan, Y.Z., Baldwin, P.R., Davis, J.H., Williamson, J.R., Potter, C.S., Carragher, B. and Lyumkis, D., 2017. Addressing preferred specimen orientation in single-particle cryo-EM through tilting. Nature methods, 14(8), p.793.
 
-This 3D FSC reimplementation in single particle spIsoNet should be faster than the origional version. The 3DFSC volume should be renerated in few minutes. This step does not use GPU accelations. You can use multiple cpu cores for parallelation by specifying "--ncpus".
+This 3D FSC reimplementation in single particle spIsoNet should be faster than the original version. The 3DFSC volume should be generated in a few minutes. This step does not use GPU accelation. You can use multiple cpu cores for parallelization by specifying "--ncpus".
 
 The input of 3D FSC calculation are two half maps and a solvent mask
 ``` {.bash language="bash"}
 spisonet.py fsc3d emd_8731_half_map_1.mrc emd_8731_half_map_2.mrc emd_8731_msk_1.mrc --ncpus 16 
 ```
 
-This will generate a 3DFSC volume called "FSC3D.mrc", which describes the Fouriear shell correlation in different directions. 
+This will generate a 3DFSC volume called "FSC3D.mrc", which describes the Fourier shell correlation in different directions. You can also tune the --limit_res parameter to set the resolution limit of the 3D FSC calculation for recovery (default is the overall resolution of the map). 
 
 ```
 11:07:17, INFO     [spisonet.py:552] Global resolution at FSC=0.143 is 4.191999816894532
-11:07:17, INFO     [spisonet.py:555] Limit resolution to 4.191999816894532 for spIsoNet 3D calculation. You can also tune this paramerter with --limit_res .
+11:07:17, INFO     [spisonet.py:555] Limit resolution to 4.191999816894532 for spIsoNet 3D calculation. 
 11:07:17, INFO     [spisonet.py:557] calculating fast 3DFSC, this will take few minutes
 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 80/80 [00:02<00:00, 28.95it/s]
 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 80/80 [00:03<00:00, 24.20it/s]
@@ -60,7 +58,7 @@ This will generate a 3DFSC volume called "FSC3D.mrc", which describes the Fourie
 
 ## 2.2. Single particle spIsoNet correction of the half map1
 
-This step used train a network for anositropic correction for first half map with "spisonet.py map_refine". The input of this command is the first halfmap and the solvent mask.
+This step used train a network for anisotropic correction for first half map with "spisonet.py map_refine". The input of this command is the first halfmap and the solvent mask.
 
 This step will create a folder to store the output files of spIsoNet. The corrected map is stored as "correctedXXX.mrc" in that folder. You can also find trained neural network "XX.pt" and figure for loss change "loss.png" in the folder.  
 
@@ -103,7 +101,7 @@ spisonet.py map_refine emd_8731_half_map_2.mrc FSC3D.mrc --mask emd_8731_msk_1.m
 
 ## 2.4. Postprocessing
 
-Postprocessing of the corrected halfmaps is not implimented in single particle spIsoNet. Please use your favourate software package for sharpening with the corrected half maps.
+Postprocessing of the corrected halfmaps is not implemented in spIsoNet. Please use your favorite software package (e.g., RELION) for sharpening with the corrected half maps.
 
 
 # 3. advanced topics
@@ -133,25 +131,25 @@ Here is the table of GPU memory consumption. Based on previous spIsoNet experien
 ## 3.3 continue from previous trained model
 The single particle spIsoNet will generate a neuronal network model named xx.pt in the output folder, you can start from that model with the parameter "--pretrained_model".
 
-Once you start with the pretained model, you may also want to change the number of epoches to run. For example, the trained model is from the 10th epochs and you can train for another 10 epoch to make it equivalent to the 20 iteractions from scratch.
+Once you start with the pretrained model, you may also want to change the number of epochs to run. For example, the trained model is from the 10th epochs and you can train for another 10 epoch to make it equivalent to the 20 iterations from scratch.
 
 You can also set epochs to zero to only perform prediction without further training
 
 
 ## 3.4 Alpha weighting
 
-The most importent parameter that affect your result in single particle spIsoNet is alpha. This alpha defines the weighting between the data consistency loss and the rotational equivarient loss. The default value one meaning putting equal weight on the two losses. The larger value means more weight on the rotational equivarient loss.
+The most important parameter that affect your result in single particle spIsoNet is alpha. This alpha defines the weighting between the data consistency loss and the rotational equivarient loss. The default value one meaning putting equal weight on the two losses. The larger value means more weight on the rotational equivariant loss.
 
 Empirically, the larger alpha value will results in smoother results. Please see the following images of corrected_half1.mrc with different alpha values.
 
 <p align="center"> <img src="figures/alpha.png" width="800"> </p>
 
 # 4. Using relion external reconstruct
-This deep-learning approach spIsoNet can be used as a regularizer in the RELION refinement process. In each iteration of Relion refinement, spIsoNet can be used to perform the 3D reconstruction to generate corrected map and use that map for orientation search in relion refine process.
+This deep-learning approach spIsoNet can be used as a regularizer in the RELION refinement process. In each iteration of RELION refinement, spIsoNet can be used to perform the 3D reconstruction to generate corrected map and use that map for orientation search in RELION refine process.
 
 To achieve this, the following steps should be performed. 
 
-## 4.1 Make sure spIsoNet is properlly installed in a conda environment.
+## 4.1 Make sure spIsoNet is properly installed in a conda environment.
 
 Install the required dependencies
 ```
@@ -162,7 +160,7 @@ pip install torch --index-url https://download.pytorch.org/whl/cu118
 pip install -r requirments.txt
 ```
 
-and set up proper environment for spIsoNet
+and set up proper environment for spIsoNet. It is required to set the RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE environment variable to point to relion_wrapper.py.
 ```
 export PATH=/home/cii/software/spIsoNet/bin:$PATH
 export PYTHONPATH=/home/cii/software:$PYTHONPATH
@@ -170,14 +168,15 @@ export RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE="python /home/cii/software/spIsoNe
 export CONDA_ENV="spisonet"
 ```
 
+## 4.2 Execute relion_wrapper.py script in RELION's relion_refine.
+To execute the script relion_wrapper.py in relion_refine, it is necessary to add the argument "--external_reconstruct" in the command line, or by adding "--external_reconstruct" in the Additional Arguments section under the Running tab in RELION GUI.
 
-
+You also need to set up CUDA_VISIBLE_DEVICES. 
 ```
-# This need 
-
-CONDA_ENV
-CUDA_VISIBLE_DEVICES
+export CUDA_VISIBLE_DEVICES="0"
 ```
+
+Additional Parameters:
 
 ```
 # if ISONET_SEPERATE is False, the two half map will pass through the same network. Set this option to False enables the noise2nosie based denoising and faster processing time.
