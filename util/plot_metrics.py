@@ -13,11 +13,13 @@ def plot_metrics(metrics, filename):
 
     fig, ax = plt.subplots()
     #with plt.style.context('Solarize_Light2'):
+    keys = []
     for k,v in metrics.items():
-        x = np.arange(len(v))+1
-        plt.plot(x, np.array(v), linewidth=2)
-
-    plt.legend(title='metrics', labels=metrics.keys())
+        if len(v)>0:
+            x = np.arange(len(v))+1
+            plt.plot(x, np.array(v), linewidth=2)
+            keys.append(k)
+    plt.legend(title='metrics', labels=keys)
     #plt.legend(title='metrics', title_fontsize = 13, labels=metrics.keys())
     #if len(tl) > 20:
     #    ma = np.percentile(tl,95)
