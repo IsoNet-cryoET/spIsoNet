@@ -241,7 +241,7 @@ if __name__=="__main__":
     limit_healpix = parse_env("ISONET_START_HEALPIX", "int", 3, silence)
     acc_batches = parse_env("ISONET_ACC_BATCHES", "int", 2, silence)
     epochs = parse_env("ISONET_EPOCHS", "int", 5, silence)
-    start_epochs = parse_env("ISONET_START_EPOCHS", "int", 5, silence)
+    start_epochs = epochs#parse_env("ISONET_START_EPOCHS", "int", 5, silence)
     combine = parse_env("ISONET_COMBINE", "bool", False, silence)
     lowpass = parse_env("ISONET_LOWPASS", "bool", True, silence)
 
