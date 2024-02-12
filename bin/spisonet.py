@@ -11,7 +11,7 @@ class ISONET:
     for detail discription, run one of the following commands:
 
     spisonet.py fsc3d -h
-    spisonet.py map_refine -h
+    spisonet.py refine -h
     """
 
 
@@ -19,9 +19,10 @@ class ISONET:
                    i1: str,
                    i2: str=None,
                    aniso_file: str = None, 
+                   mask: str=None, 
+
                    independent: bool=False,
 
-                   mask: str=None, 
                    gpuID: str=None,
 
                    alpha: float=1,
@@ -45,15 +46,23 @@ class ISONET:
                    ):
 
         """
-        \ntrain neural network to correct preffered orientation\n
-        spisonet.py map_refine half.mrc FSC3D.mrc mask.mrc [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
-        :param input: Input name
+        \nTrain neural network to correct preffered orientation\n
+        spisonet.py map_refine half.mrc FSC3D.mrc --mask mask.mrc --limit_res 3.5 [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
+        :param i1: Input half map 1
+        :param i2: Input half map 2
+        :param aniso_file: 3DFSC file
         :param mask: Filename of a user-provided mask
+        :param independent: Independently process half1 and half2, this will disable the noise2noise-based denoising but will provide independent maps for gold-standard FSC
         :param gpuID: The ID of gpu to be used during the training.
+        :param alpha: Ranging from 0 to inf. Weighting between the equivariance loss and consistency loss.
+        :param beta: Ranging from 0 to inf. Weighting of the denoising. Large number means more denoising. 
+        :param limit_res: Important! Resolution limit for spIsoNet recovery. Information beyong this limit will not be modified.
         :param ncpus: Number of cpu.
         :param output_dir: The name of directory to save output maps
-        :param fsc_file: 3DFSC file if not set, isonet will generate one.
-        :param epochs: Number of epochs for each iteration. This value can be increase (maybe to 10) to get (maybe) better result.
+        :param pretrained_model: The neural network model with ".pt" to continue training or prediction. 
+        :param reference: Retain the low resolution information from the reference in the spIsoNet refine process.
+        :param ref_resolution: The limit resolution to keep from the reference. Ususlly  10-20 A resolution. 
+        :param epochs: Number of epochs.
         :param n_subvolume: Number of subvolumes 
         :param predict_crop_size: The size of subvolumes, should be larger then the cube_size
         :param cube_size: Size of cubes for training, should be divisible by 16, e.g. 32, 64, 80.
@@ -190,6 +199,9 @@ class ISONET:
                     high_res: float=3,
                     low_res: float=10,
                     ):
+        """
+        \nFlattening Fourier amplitude within the resolution range. This will sharpen the map. Low resolution is typically 10 and high resolution limit is typicaly the resolution at FSC=0.143\n
+        """
         import numpy as np
         import mrcfile
         from numpy.fft import fftshift, fftn, ifftn
@@ -255,6 +267,9 @@ class ISONET:
                     out_map:str,
                     threshold_res: float,
                     mask_file: str=None):
+        """
+        \nCombine the low resolution info (lower than threshold_res) of one map and high resolution info (higher than (lower than threshold_res) of another map to produce a chimeric map. 
+        """
         import numpy as np
         import mrcfile
         with mrcfile.open(low_map,'r') as mrc:
@@ -292,7 +307,7 @@ class ISONET:
                    ):
 
         """
-        \ntrain neural network to correct preffered orientation\n
+        \n3D Fourier shell correlation\n
         spisonet.py map_refine half1.mrc half2.mrc mask.mrc [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
         :param h: Input name of half1
         :param h2: Input name of half2
@@ -300,7 +315,8 @@ class ISONET:
         :param ncpus: Number of cpu.
         :param limit_res: The resolution limit for recovery, default is the resolution of the map.
         :param fsc_file: 3DFSC file if not set, isonet will generate one.
-        :param cone_sampling_angle: Angle for 3D fsc sampling for spIsoNet generated 3DFSC. spIsoNet default is 10 degrees, the default for official 3DFSC is 20 degrees.
+        :param cone_sampling_angle: Angle for 3D fsc sampling for spIsoNet generated 3DFSC. spIsoNet default is 10 degrees, the default for official 3DFSC is 20 degrees
+        :param keep_highres: Set high frequency region to 1 instead of 0. This should be False
         """
         logging.basicConfig(format='%(asctime)s, %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s'
             ,datefmt="%H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])   
@@ -473,7 +489,10 @@ class ISONET:
             mrc.set_data(out_map)
             mrc.voxel_size = voxel_size
 
-    def angular_whiten(self, in_name,out_name,resolution_initial, limit_resolution):
+    def angular_whiten(self, in_name,out_name,low_res, high_res):
+        """
+        \nWhitening across different orientations. To prevent over representation at some of the directions
+        """
         import mrcfile
 
         with mrcfile.open(in_name) as mrc:
@@ -481,26 +500,26 @@ class ISONET:
             voxel_size = mrc.voxel_size.x
 
         from spIsoNet.util.FSC import angular_whitening
-        out_map = angular_whitening(in_map,voxel_size,resolution_initial,limit_resolution)
+        out_map = angular_whitening(in_map,voxel_size,low_res,high_res)
         with mrcfile.new(out_name, overwrite=True) as mrc:
             mrc.set_data(out_map)
             mrc.voxel_size = tuple([voxel_size]*3) 
 
-    def check(self):
-        logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',
-        datefmt="%m-%d %H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])
+    # def check(self):
+    #     logging.basicConfig(format='%(asctime)s, %(levelname)-8s %(message)s',
+    #     datefmt="%m-%d %H:%M:%S",level=logging.DEBUG,handlers=[logging.StreamHandler(sys.stdout)])
 
-        from spIsoNet.bin.predict import predict
-        from spIsoNet.bin.refine import run
-        import skimage
-        import PyQt5
-        import tqdm
-        logging.info('spIsoNet --version 1.0 alpha installed')
-        logging.info(f"checking gpu speed")
-        from spIsoNet.bin.verify import verify
-        fp16, fp32 = verify()
-        logging.info(f"time for mixed/half precsion and single precision are {fp16} and {fp32}. ")
-        logging.info(f"The first number should be much smaller than the second one, if not please check whether cudnn, cuda, and pytorch versions match.")
+    #     from spIsoNet.bin.predict import predict
+    #     from spIsoNet.bin.refine import run
+    #     import skimage
+    #     import PyQt5
+    #     import tqdm
+    #     logging.info('spIsoNet --version 1.0 alpha installed')
+    #     logging.info(f"checking gpu speed")
+    #     from spIsoNet.bin.verify import verify
+    #     fp16, fp32 = verify()
+    #     logging.info(f"time for mixed/half precsion and single precision are {fp16} and {fp32}. ")
+    #     logging.info(f"The first number should be much smaller than the second one, if not please check whether cudnn, cuda, and pytorch versions match.")
 
     # def gui(self):
     #     """

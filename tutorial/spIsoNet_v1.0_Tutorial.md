@@ -57,9 +57,9 @@ spisonet.py refine emd_8731_half_map_1.mrc emd_8731_half_map_2.mrc --aniso_file 
 Here is expected command line output
 ``` {.bash language="bash"}
 11:13:15, INFO     [spisonet.py:466] voxel_size 1.309999942779541
-11:13:24, INFO     [map_refine.py:239] Start preparing subvolumes!
-11:13:24, INFO     [map_refine.py:242] Done preparing subvolumes!
-11:13:24, INFO     [map_refine.py:244] Start training!
+11:13:24, INFO     [refine.py:239] Start preparing subvolumes!
+11:13:24, INFO     [refine.py:242] Done preparing subvolumes!
+11:13:24, INFO     [refine.py:244] Start training!
 11:13:25, INFO     [network.py:202] Port number: 43963
 learning rate 0.0003
 (8, 9)
@@ -69,7 +69,7 @@ Epoch [1/20], Train Loss: 0.6581
 ...
 
 ```
-You can check the command line argument for the map_refine with the following command:
+You can check the command line argument for the refine with the following command:
 ``` {.bash language="bash"}
 spisonet.py refine --help
 ```
@@ -234,10 +234,10 @@ using all GPUs in this node: 0,1,2,3
 18:34:46, INFO     [utils.py:15] The Refine3D/job032 folder already exists, outputs will write into this folder
 18:34:46, INFO     [spisonet.py:224] voxel_size 1.3099980354309082
 run_it025_half_class001_unfil
-18:34:46, INFO     [map_refine.py:299] Filter map to resolution 3.422041 for spIsoNet correction!
-18:34:56, INFO     [map_refine.py:311] Start preparing subvolumes!
-18:34:56, INFO     [map_refine.py:314] Done preparing subvolumes!
-18:34:56, INFO     [map_refine.py:316] Start training!
+18:34:46, INFO     [refine.py:299] Filter map to resolution 3.422041 for spIsoNet correction!
+18:34:56, INFO     [refine.py:311] Start preparing subvolumes!
+18:34:56, INFO     [refine.py:314] Done preparing subvolumes!
+18:34:56, INFO     [refine.py:316] Start training!
 18:34:56, INFO     [network_n2n.py:232] Port number: 42765
 learning rate 0.0003
 ['Refine3D/job032/run_it025_half1_class001_unfil_data', 'Refine3D/job032/run_it025_half2_class001_unfil_data']
@@ -252,12 +252,12 @@ Epoch [5/5], Train Loss: 0.8300
 18:38:58, DEBUG    [__init__.py:1499] platform is linux
 18:38:58, DEBUG    [__init__.py:337] CACHEDIR=/home/cii/.cache/matplotlib
 18:38:58, DEBUG    [font_manager.py:1574] Using fontManager instance from /home/cii/.cache/matplotlib/fontlist-v330.json
-18:38:59, INFO     [map_refine.py:346] Start predicting!
+18:38:59, INFO     [refine.py:346] Start predicting!
 data_shape torch.Size([125, 1, 80, 80, 80])
 size restored (334, 334, 334)
 data_shape torch.Size([125, 1, 80, 80, 80])
 size restored (334, 334, 334)
-18:39:11, INFO     [map_refine.py:369] Done predicting
+18:39:11, INFO     [mrefine.py:369] Done predicting
 18:39:11, INFO     [spisonet.py:250] combining
 18:39:11, INFO     [spisonet.py:335] voxel_size 1.3099980354309082
 18:39:23, INFO     [spisonet.py:335] voxel_size 1.3099980354309082
@@ -318,7 +318,6 @@ ISONET_WHITENING_LOW defines the starting resolution for whitening.
 ```
 ISONET_WHITENING=True
 ISONET_WHITENING_LOW=10
-
 ```
 10. ISONET_FSC_WEIGHTING define whether FSC weighting is performed before running spIsoNet. Typical we set this as True.
 ```
