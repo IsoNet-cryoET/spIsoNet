@@ -78,7 +78,7 @@ def execute_whitening(fn1,fscn,mask,high_res,low_res=10):
     print(params)
     os.system(params)
 
-def execute_combine(f1,f2,f3,limit_res=20, mask_file=None): 
+def execute_keep_lowres(f1,f2,f3,limit_res=20, mask_file=None): 
     params = ' eval "$(conda shell.bash hook)" && conda activate %s && ' %CONDA_ENV     
     params += ' spisonet.py combine_map '
     params += ' %s' %(f1)  
@@ -242,7 +242,7 @@ if __name__=="__main__":
     acc_batches = parse_env("ISONET_ACC_BATCHES", "int", 2, silence)
     epochs = parse_env("ISONET_EPOCHS", "int", 5, silence)
     start_epochs = epochs#parse_env("ISONET_START_EPOCHS", "int", 5, silence)
-    combine = parse_env("ISONET_COMBINE", "bool", False, silence)
+    keep_lowres = parse_env("ISONET_KEEP_LOWRES", "bool", False, silence)
     lowpass = parse_env("ISONET_LOWPASS", "bool", True, silence)
 
     awhiten = parse_env("ISONET_ANGULAR_WHITEN", "bool", False, silence)    
@@ -257,11 +257,11 @@ if __name__=="__main__":
     # resolution_initial
     with open("%s/%s_it000_optimiser.star" %(dir,basename)) as file:
         for line_number,li in enumerate(file.readlines()):
-            if '--combine' in li:
-                combine = True
+            if '--keep_lowres' in li:
+                keep_lowres = True
                 break
     if not silence:
-        print("set ISONET_COMBINE=",combine)       
+        print("set ISONET_KEEP_LOWRES=",keep_lowres)       
 
     # healpix
     with open("%s/%s_it%s_sampling.star" %(dir,basename,beforeVar)) as file:
@@ -356,7 +356,7 @@ if __name__=="__main__":
         mrc_unfil_backup = '%s/%s_it%s_%s_class001_unfil_backup.mrc' %(dir,basename,var,half_str)
         mrc_lowpass_backup = '%s/%s_it%s_%s_class001_unfil_lowpass_backup.mrc' %(dir,basename,var,half_str)
         mrc_whiten_backup = '%s/%s_it%s_%s_class001_unfil_whiten_backup.mrc' %(dir,basename,var,half_str)
-        mrc_combine_backup = '%s/%s_it%s_%s_class001_unfil_combine_backup.mrc' %(dir,basename,var,half_str)
+        mrc_keep_lowres_backup = '%s/%s_it%s_%s_class001_unfil_keep_lowres_backup.mrc' %(dir,basename,var,half_str)
         mrc_overwrite = '%s/%s_it%s_%s_class001_external_reconstruct.mrc' %(dir,basename,var,half_str)
         mrc_overwrite_backup = '%s/%s_it%s_%s_class001_external_reconstruct_backup.mrc' %(dir,basename,var,half_str)
         shutil.copy(mrc_unfil, mrc_unfil_backup)
@@ -368,9 +368,9 @@ if __name__=="__main__":
             shutil.copy(mrc_unfil, mrc_whiten_backup)
             shutil.copy(mrc_unfil, mrc_overwrite)
 
-        if combine:
-            execute_combine(mrc_initial,mrc_unfil,mrc_unfil,resolution_initial, mask_file=mask_file) 
-            shutil.copy(mrc_unfil, mrc_combine_backup)
+        if keep_lowres:
+            execute_keep_lowres(mrc_initial,mrc_unfil,mrc_unfil,resolution_initial, mask_file=mask_file) 
+            shutil.copy(mrc_unfil, mrc_keep_lowres_backup)
             shutil.copy(mrc_unfil, mrc_overwrite)
 
         if False:
