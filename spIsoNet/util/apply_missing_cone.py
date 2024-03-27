@@ -72,9 +72,6 @@ def normalize(d):
     d = (d-d.mean()) / d.std()
     return d
 
-def generate_command(halfmap_file, FSC_file, mask_file):
-    return f"isonet.py map_refine {halfmap_file} {FSC_file} {mask_file}"
-
 if __name__ == '__main__':
     #F = get_F_double_wedge(400,60)
     map_diameter = 400

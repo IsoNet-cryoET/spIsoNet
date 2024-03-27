@@ -1,7 +1,7 @@
 
 # spIsoNet version 1.0
 
-Update on Feb 7 2024
+Update on Mar.27 2024
 
 Single Particle spIsoNet (spIsoNet) is designed to correct for the preferred orientation problem in cryoEM by self-supervised deep learning, by recovering missing information from well-sampled orientations in Fourier space. 
 
@@ -14,27 +14,59 @@ Please find tutorial/spIsoNet_v1.0_Tutorial.md for detailed document.
 ## Google group
 We maintain an spIsoNet Google group for discussions or news.
 
-To subscribe or visit the group via the web interface please visit https://groups.google.com/u/1/g/isonet. 
+To subscribe or visit the group via the web interface please visit https://groups.google.com/u/1/g/spisonet. 
 
-If you do not have and are not willing to create a Google login, you can also request membership by sending an email to yuntao@g.ucla.edu
+To post to the forum you can either use the web interface or email to spisonet@googlegroups.com
 
-To post to the forum you can either use the web interface or email to isonet@googlegroups.com
-
-# 1. Installation
+# Installation
 
 We suggest using anaconda environment to manage the spIsoNet package.
 
-1. Install cudatoolkit and cudnn on your computer.
-2. Install pytorch from https://pytorch.org/ 
-3. Create an conda virtual environment and install dependencies by running install.sh in the spIsoNet folder or by pip install
-   The dependencies include tqdm, matplotlib, scipy, numpy, scikit-image, mrcfile, fire
-4. For example, add the following lines in your ~/.bashrc
+Example commands to install spIsoNet
 
-    export PATH=PATH_TO_ISONET_FOLDER/bin:$PATH 
+*Option 1:*
+```
+conda create -n spisonet python=3.10
+conda activate spisonet
+pip install torch --index-url https://download.pytorch.org/whl/cu118
+cd <path to spIsoNet>
+pip install .
+```
+and then set the following environment variable for Misalignment Correction
+```
+export RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE="python <path to spIsoNet>/spIsoNet/bin/relion_wrapper.py"
+export CONDA_ENV="spisonet"
+```
 
-    export PYTHONPATH=PATH_TO_PARENT_FOLDER_OF_ISONET_FOLDER:$PYTHONPATH 
-    or you can run source source-env.sh in your terminal, which will export required variables into your environment.
-5. Now spIsoNet is available to use.
+*Option 2:*
+```
+conda env create -f setup.yml
+conda activate spisonet
+```
+
+and then set the following environment variable for Misalignment Correction
+```
+export RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE="python <path to spIsoNet>/spIsoNet/bin/relion_wrapper.py"
+export CONDA_ENV="spisonet"
+```
+
+*Option 3:*
+```
+conda create -n spisonet python=3.10
+conda activate spisonet
+conda install -c "nvidia/label/cuda-11.8.0" cuda-toolkit
+pip install torch --index-url https://download.pytorch.org/whl/cu118
+pip install -r requirements.txt
+```
+
+and then set the following environment variable for Misalignment Correction
+```
+export RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE="python <path to spIsoNet>/spIsoNet/bin/relion_wrapper.py"
+export CONDA_ENV="spisonet"
+export PATH=<path to spIsoNet>/spIsoNet/bin:$PATH
+export PYTHONPATH=<path to spIsoNet>:$PYTHONPATH
+```
+
 
 The environment we verified are:
 1. cuda11.8 cudnn8.5 pytorch2.0.1, pytorch installed with pip.

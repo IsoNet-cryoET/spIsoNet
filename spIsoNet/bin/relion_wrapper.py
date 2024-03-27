@@ -32,7 +32,7 @@ def execute_external_relion(star):
 def execute_deep(mrc1, mrc2, fsc3d, dir, gpu, limit_res, epochs = 1, mask_file = None, pretrained_model=None, alpha = None, acc_batches= None, batch_size = None, beta=None): 
     #data_file =  ' %s/%s_it%s_half%s_class001_external_reconstruct.mrc' %(dir, basename, var, half)   
     params = ' eval "$(conda shell.bash hook)" && conda activate %s && ' %CONDA_ENV     
-    params += ' spisonet.py refine '
+    params += ' spisonet.py reconstruct '
     params += f" {mrc1} {mrc2}"      
     params += ' --aniso_file %s' %(fsc3d) 
     params += ' --epochs %s --n_subvolume 1000'   %(epochs)
@@ -250,7 +250,7 @@ if __name__=="__main__":
     use_fsc_05 = parse_env("ISONET_FSC_05", "bool", False, silence)    
     do_fsc_weighting = parse_env("ISONET_FSC_WEIGHTING", "bool", True, silence)   
     #do_fsc_weighting_after = parse_env("ISONET_FSC_WEIGHTING_AFTER", "bool", True, silence) 
-
+    resolution_threshold=parse_env("ISONET_START_RESOLUTION", "float", 15.0, silence)    
 
 
 
@@ -392,11 +392,11 @@ if __name__=="__main__":
         sync3 = '%s/%s_it%s_class001_external_reconstruct.sync3' %(dir,basename,var)
         sync4 = '%s/%s_it%s_class001_external_reconstruct.sync4' %(dir,basename,var)
 
-        if (healpix >= limit_healpix) and (limit_resolution < 15) and (half_str == "half2"):
+        if (healpix >= limit_healpix) and (limit_resolution < resolution_threshold) and (half_str == "half2"):
             write_to_file(sync4)
             wait_until_file(sync3)
 
-        elif (healpix >= limit_healpix) and (limit_resolution < 15) and (half_str == "half1"):
+        elif (healpix >= limit_healpix) and (limit_resolution < resolution_threshold) and (half_str == "half1"):
             wait_until_file(sync4)
             
             mrc1_overwrite = '%s/%s_it%s_half1_class001_external_reconstruct.mrc' %(dir,basename,var)

@@ -1,16 +1,19 @@
-name: pytorch
+name: spisonet
 channels:
-  - conda-forge
+  - pytorch
+  - nvidia
   - defaults
 
 dependencies:
-  - cudatoolkit=11.2
-  - cudnn=8.1
-  - python=3.8
-  - scikit-image
-  - matplotlib
-  - numpy
-  - mrcfile
-  - fire
-  - tqdm
+  - python=3.10
   - pytorch
+  - pytorch-cuda=11.8
+  - pip
+  - pip:
+    - scikit-image
+    - matplotlib
+    - numpy
+    - mrcfile
+    - fire
+    - tqdm
+    - .

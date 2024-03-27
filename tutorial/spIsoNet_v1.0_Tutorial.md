@@ -5,25 +5,85 @@ Unlike conventional supervised deep learning methods that need explicit input-ou
 
 spIsoNet is designed for single particle analysis and subtomogram averaging. For the correcting missing wedge in cryoET, please refer to IsoNet.
 
-# 1. Quick run
+# 1. Installation
 
-The default parameter in spIsoNet should be suitable for most cases.
+We suggest using anaconda environment to manage the spIsoNet package.
 
-## 1.0 prepare data set
-The tutorial data can be downloaded on google drive: xxx
+Example commands to install spIsoNet
 
-The tutorial data set contains a two half maps: emd_8731_half_map_1.mrc and emd_8731_half_map_2.mrc and a solvent mask emd_8731_msk_1.mrc. 
+*Option 1:*
+```
+conda create -n spisonet python=3.10
+conda activate spisonet
+pip install torch --index-url https://download.pytorch.org/whl/cu118
+cd <path to spIsoNet>
+pip install .
+```
+and then set the following environment variable for Misalignment Correction
+```
+export RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE="python <path to spIsoNet>/spIsoNet/bin/relion_wrapper.py"
+export CONDA_ENV="spisonet"
+```
 
-After you download the files put those into a new folder.
+*Option 2:*
+```
+conda env create -f setup.yml
+conda activate spisonet
+```
 
-## 1.1. calculate 3DFSC
+and then set the following environment variable for Misalignment Correction
+```
+export RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE="python <path to spIsoNet>/spIsoNet/bin/relion_wrapper.py"
+export CONDA_ENV="spisonet"
+```
 
-The algorithm for 3D FSC is based on
+*Option 3:*
+```
+conda create -n spisonet python=3.10
+conda activate spisonet
+conda install -c "nvidia/label/cuda-11.8.0" cuda-toolkit
+pip install torch --index-url https://download.pytorch.org/whl/cu118
+pip install -r requirements.txt
+```
+
+and then set the following environment variable for Misalignment Correction
+```
+export RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE="python <path to spIsoNet>/spIsoNet/bin/relion_wrapper.py"
+export CONDA_ENV="spisonet"
+export PATH=<path to spIsoNet>/spIsoNet/bin:$PATH
+export PYTHONPATH=<path to spIsoNet>:$PYTHONPATH
+```
+
+
+The environment we verified are:
+1. cuda11.8 cudnn8.5 pytorch2.0.1, pytorch installed with pip.
+2. cuda11.3 cudnn8.2 pytorch1.13.1, pytorch installed with conda.
+
+# 2. Anisotropy Correction
+
+The default parameters in spIsoNet should be suitable for most cases.
+
+## 2.0 prepare data set
+The tutorial data can be downloaded here: https://www.ebi.ac.uk/emdb/EMD-8731?tab=interpretation
+
+
+Two half maps: emd_8731_half_map_1.map and emd_8731_half_map_2.map and a solvent mask emd_8731_msk_1.map are needed to complete anistropy correction tutorial 
+
+Please replease the file extension map to mrc.
+```
+mv emd_8731_half_map_1.map emd_8731_half_map_1.mrc
+mv emd_8731_half_map_2.map emd_8731_half_map_2.mrc
+mv emd_8731_msk_1.map emd_8731_msk_1.mrc
+```
+
+## 2.1. calculate 3DFSC
+
+The algorithm for 3D FSC is customized based on
 Tan, Y.Z., Baldwin, P.R., Davis, J.H., Williamson, J.R., Potter, C.S., Carragher, B. and Lyumkis, D., 2017. Addressing preferred specimen orientation in single-particle cryo-EM through tilting. Nature methods, 14(8), p.793.
 
 The 3DFSC volume (the default file name is FSC3D.mrc) should be generated in a few minutes. This step does not use GPU accelation. You can use multiple cpu cores for parallelization by specifying "--ncpus".
 
-Thie FSC3D.mrc will be used in the following refine step as "aniso_file"
+Thie FSC3D.mrc will be used in the following reconstruct step as "aniso_file"
 
 The input of 3D FSC calculation are two half maps and a solvent mask
 ``` {.bash language="bash"}
@@ -43,15 +103,15 @@ You can also tune the --limit_res parameter to set the resolution limit of the 3
 11:07:23, INFO     [spisonet.py:562] voxel_size 1.309999942779541
 ```
 
-## 1.2. Single particle spIsoNet correction of the half maps
+## 2.2. Anisotropy Correction of the half maps
 
-This step trains a network for anisotropic correction with "spisonet.py refine". 
+This step trains a network for Anisotropy Correction with "spisonet.py reconstruct".
 
 This step will create a folder to store the output files of spIsoNet. The corrected map is stored as "correctedXXX.mrc" in that folder. You can also find trained neural network "XX.pt" and figure for loss change "loss.png" in the folder.  
 
 The command to using single particle spIsoNet should be
 ``` {.bash language="bash"}
-spisonet.py refine emd_8731_half_map_1.mrc emd_8731_half_map_2.mrc --aniso_file FSC3D.mrc --mask emd_8731_msk_1.mrc --epochs 30 --alpha 1 --beta 0.5 --output_dir isonet_maps --gpuID 0,1,2,3 --acc_batches 2
+spisonet.py reconstruct emd_8731_half_map_1.mrc emd_8731_half_map_2.mrc --aniso_file FSC3D.mrc --mask emd_8731_msk_1.mrc --limit_res 3.5 --epochs 30 --alpha 1 --beta 0.5 --output_dir isonet_maps --gpuID 0,1,2,3 --acc_batches 2
 ```
 
 Here is expected command line output
@@ -64,29 +124,29 @@ Here is expected command line output
 learning rate 0.0003
 (8, 9)
 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 250/250 [02:13<00:00,  1.87batch/s, Loss=0.598]
-Epoch [1/20], Train Loss: 0.6581
+Epoch [1/30], Train Loss: 0.6581
  14%|█████████████████████████████████▌                                                                                                                                                                                                       | 36/250 [00:16<01:40,  2.14batch/s, Loss=0.533]
 ...
 
 ```
 You can check the command line argument for the refine with the following command:
 ``` {.bash language="bash"}
-spisonet.py refine --help
+spisonet.py reconstruct --help
 ```
 
-## 1.3. Postprocessing
+## 2.3. Postprocessing
 
 Postprocessing of the corrected halfmaps is not implemented in spIsoNet. You can use *relion_postprocess* to sharpen the corrected maps.
 
 
-# 2. advanced topics
+# 3. advanced topics
 
-## 2.1 limit resolution
+## 3.1 limit resolution
 This parameter defined as the resolution limit for spIsoNet recovery. The maps will be first filtered to this resolution for the neural network training. After the network is trained, it will produced a "corrected_xx_filtered.mrc". Then the information beyond this resolution will be added to produce the final results "corrected_xx.mrc".
 
 The higher resolution will introduce unreliable noise that may compromise the results. A lower value may lead to maps with partically recovered missing information. We tested that  the resolution at 0.143 or 3.5A could be good starting points to test this value. 
 
-## 2.2 GPU memory consumption and acc_batches
+## 3.2 GPU memory consumption and acc_batches
 Here is the table of GPU memory consumption. Based on our experience, larger batch size (> 4) works slightly better. 
 
 acc_batches larger than 1 uses accumulate gradient to reduce memory consumption. Usually acc_batches can be 2 for most cases. If you have GPU with large memory, acc_batches = 1 should process slightly faster. 
@@ -103,7 +163,7 @@ batch_size should be divisible by acc_batches.
 | 4        | 8*      | 2*      | ~6GB    |
 * means default values
 
-## 2.3 predict directly or continue from a trained model
+## 3.3 predict directly or continue from a trained model
 The single particle spIsoNet will generate a neuronal network model named xx.pt in the output folder, you can start from that model with the parameter "--pretrained_model".
 
 Once you start with the pretrained model, you may also want to change the number of epochs to run. For example, the trained model is from the 10th epochs and you can train for another 10 epochs to make it equivalent to the 20 epochs from scratch.
@@ -111,7 +171,7 @@ Once you start with the pretrained model, you may also want to change the number
 You can also set "--epochs" to 0 together with "--pretrained_model" to only perform prediction without further training
 
 
-## 2.4 Alpha and Beta weighting
+## 3.4 Alpha and Beta weighting
 
 The alpha value defines the weighting between the data consistency loss and the rotational equivarient loss. The default value 1 meaning putting equal weight on the two losses. The larger value means more weight on the rotational equivariant loss.
 
@@ -121,17 +181,17 @@ Empirically, the larger alpha value will results in smoother results. Please see
 
 The beta value defines the weighting between missing information recovery and the denoising. The larger value leads to more denoised output maps. The default beta velue is 0.5. We typically do not change this value. 
 
-## 2.5 run spIsoNet with a reliable reference
-If you have a low resolution map of your sample that is reliable and with less severe perferred orientation, you can use this as a reference (with parameter --reference) for the spIsoNet refine. This allows you to retain the low resolution information (defined with --ref_resolution parameter) from the reference in the spIsoNet refine process. This may improve the results.
+## 3.5 run spIsoNet with a reliable reference
+If you have a low resolution map of your sample that is reliable and with less severe perferred orientation, you can use this as a reference (with parameter --reference) for the spIsoNet reconstruct. This allows you to retain the low resolution information (defined with --ref_resolution parameter) from the reference in the spIsoNet reconstruct process. This may improve the results.
 
 The default --ref_resolution is 10, this resolution should be much lower than the resolution of the reference. We recommand the reference resolution to be 10-20A. 
 
-## 2.6 process two half maps independently
-The noise2noise-based denoising is by default used in the spIsoNet refine process. It will produce cleaner and better maps. However, this denoising network will see both half1 and half2, which will break the independency of the two half maps.
+## 3.6 process two half maps independently
+The noise2noise-based denoising is by default used in the spIsoNet anistropy correction process. It will produce cleaner and better maps. However, this denoising network will see both half1 and half2, which will break the independency of the two half maps.
 
 You can specify the "--independent" as True to run the two half map independently, which will only perform missing information recovery without denoising. This step will train two networks each for one half map. The results generated from "--independent" reconstruction can be used for the "gold-standard" FSC calculation.  
 
-## 2.6 Loss curve and epochs
+## 3.7 Loss curve and epochs
 The calculated with respective to the epochs is ploted and generated as a "png" file in the output folder. The loss function should gradually decrease throughout the training. Here is an example of the loss plot.
 
 <p align="center"> <img src="figures/loss_example.png" width="400"> </p>
@@ -139,36 +199,29 @@ The calculated with respective to the epochs is ploted and generated as a "png" 
 Typically 30 epochs is sufficient. You can also increase the number of epochs to obtain a lower loss. 
 
 
-# 3. spIsoNet enpowered Relion refine
+# 4. Misalignment Correction
 The particle alignment will nevertheless be influenced by distorted map with perferred orientation. This step is very useful in terms of generate a better alignment and subsqeuence a better cryoEM map.
 
 This deep-learning approach spIsoNet can be used as a regularizer in the RELION refinement process. In each iteration of RELION refinement, spIsoNet can be used to perform the 3D reconstruction to generate corrected map and use that map for orientation search in RELION refine process.
 
-We tested the relion3.1 and relion4.0 works for spIsoNet enpowered Relion refine
+We tested the RELION3.1 and RELION4.0 works for spIsoNet Misalignment Correction
 
-To achieve this, the following steps should be performed. 
+After Misalignment Correction, you may further perform spIsoNet anistropy correction using the relion generated half maps to improve the map quality. 
 
-After those steps, you may further perform spIsoNet map refine using the relion generated half maps to improve the map quality. 
+The spIsoNet tutorial dataset can be downloaded from "https://ucla.box.com/s/0fwos64za746lcy2qd5jj1qhntu69ssg".
+This is a subset of EMPIAR-10096, including particle star file, particle stack file, mask file and a low resolution reference. From this dataset, we can obetain a 3.5A resolution structure with spIsoNet Misalignment Correction.
 
-## 3.1 Make sure spIsoNet is properly installed in a conda environment.
+## 4.1 Make sure spIsoNet is properly installed in a conda environment.
 
-Install the required dependencies
+Install the required dependencies. This need a conda environment and a RELION installation. It is required to set the RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE environment variable to point to relion_wrapper.py.
 ```
-conda create -n spisonet python=3.10
-conda activate spisonet 
-conda install -c "nvidia/label/cuda-11.8.0" cuda-toolkit
-pip install torch --index-url https://download.pytorch.org/whl/cu118
-pip install -r requirments.txt
-```
-and set up proper environment for spIsoNet. It is required to set the RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE environment variable to point to relion_wrapper.py.
-```
-export PATH=/home/cii/software/spIsoNet/bin:$PATH
-export PYTHONPATH=/home/cii/software:$PYTHONPATH
-export RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE="python /home/cii/software/spIsoNet/bin/relion_wrapper.py"
+export RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE="python <path to spIsoNet>/spIsoNet/bin/relion_wrapper.py"
 export CONDA_ENV="spisonet"
+export PATH=<path to spIsoNet>/spIsoNet/bin:$PATH
+export PYTHONPATH=<path to spIsoNet>:$PYTHONPATH
 ```
 
-## 3.2 Execute relion_wrapper.py script in RELION's relion_refine.
+## 4.2 Execute relion_wrapper.py script in RELION's relion_refine.
 To execute the script relion_wrapper.py in relion_refine, it is necessary to add the argument "--external_reconstruct" in the command line, or by adding "--external_reconstruct" in the Additional Arguments section under the Running tab in RELION GUI.
 
 Here is an example command:
@@ -256,7 +309,7 @@ data_shape torch.Size([125, 1, 80, 80, 80])
 size restored (334, 334, 334)
 data_shape torch.Size([125, 1, 80, 80, 80])
 size restored (334, 334, 334)
-18:39:11, INFO     [mrefine.py:369] Done predicting
+18:39:11, INFO     [refine.py:369] Done predicting
 18:39:11, INFO     [spisonet.py:250] combining
 18:39:11, INFO     [spisonet.py:335] voxel_size 1.3099980354309082
 18:39:23, INFO     [spisonet.py:335] voxel_size 1.3099980354309082
@@ -267,9 +320,9 @@ finished spisonet reconstruction
 
 ```
 
-## 3.3 Environment variables for the relion wrapper.
+## 4.3 Environment variables for the RELION wrapper.
 
-To tune the parameter of spIsoNet enpowered relion refinement, you can set up more linux environemnt variables as follows:
+To tune the parameter of spIsoNet Misalignment Correction, you can set up more linux environemnt variables as follows:
 
 1. set which GPU(s) you can use by sepecify the CUDA_VISIBLE_DEVICES. By default, spIsoNet will use up all the avaliable GPUs 
 ```
@@ -287,9 +340,10 @@ export ISONET_BETA=0.5
 export ISONET_ALPHA=1
 ```
 
-4. START_HEALPIX defines at which angular sampling step the spIsoNet training will be performed.
+4. START_HEALPIX defines at which angular sampling step and the resolution the spIsoNet training will be performed.
 ```
 ISONET_START_HEALPIX=3
+ISONET_START_RESOLUTION=15
 ```
 
 5. ISONET_RETRAIN_EACH_ITER defines whether the network should be retrained from scratch or from previous iteration of relion refine. This is typically set to True

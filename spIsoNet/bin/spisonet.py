@@ -11,11 +11,11 @@ class ISONET:
     for detail discription, run one of the following commands:
 
     spisonet.py fsc3d -h
-    spisonet.py refine -h
+    spisonet.py reconstruct -h
     """
 
 
-    def refine(self, 
+    def reconstruct(self, 
                    i1: str,
                    i2: str=None,
                    aniso_file: str = None, 
@@ -36,7 +36,7 @@ class ISONET:
                    reference: str=None,
                    ref_resolution: float=10,
 
-                   epochs: int=50,
+                   epochs: int=30,
                    n_subvolume: int=1000, 
                    cube_size: int=64,
                    predict_crop_size: int=80,
@@ -47,7 +47,7 @@ class ISONET:
 
         """
         \nTrain neural network to correct preffered orientation\n
-        spisonet.py map_refine half.mrc FSC3D.mrc --mask mask.mrc --limit_res 3.5 [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
+        spisonet.py reconstruct half.mrc FSC3D.mrc --mask mask.mrc --limit_res 3.5 [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
         :param i1: Input half map 1
         :param i2: Input half map 2
         :param aniso_file: 3DFSC file
@@ -60,7 +60,7 @@ class ISONET:
         :param ncpus: Number of cpu.
         :param output_dir: The name of directory to save output maps
         :param pretrained_model: The neural network model with ".pt" to continue training or prediction. 
-        :param reference: Retain the low resolution information from the reference in the spIsoNet refine process.
+        :param reference: Retain the low resolution information from the reference in the spIsoNet reconstruct process.
         :param ref_resolution: The limit resolution to keep from the reference. Ususlly  10-20 A resolution. 
         :param epochs: Number of epochs.
         :param n_subvolume: Number of subvolumes 
@@ -308,7 +308,7 @@ class ISONET:
 
         """
         \n3D Fourier shell correlation\n
-        spisonet.py map_refine half1.mrc half2.mrc mask.mrc [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
+        spisonet.py fsc3d half1.mrc half2.mrc mask.mrc [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
         :param h: Input name of half1
         :param h2: Input name of half2
         :param mask: Filename of a user-provided mask
@@ -382,7 +382,7 @@ class ISONET:
 
         """
         \nFourier shell density, reimpliment from cryoEF, relies on relion star file and also relion installation.\n
-        spisonet.py map_refine half1.mrc half2.mrc mask.mrc [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
+        spisonet.py fsc3d half1.mrc half2.mrc mask.mrc [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
         :param h: Input name of half1
         :param h2: Input name of half2
         :param mask: Filename of a user-provided mask
@@ -520,7 +520,9 @@ class ISONET:
     #     fp16, fp32 = verify()
     #     logging.info(f"time for mixed/half precsion and single precision are {fp16} and {fp32}. ")
     #     logging.info(f"The first number should be much smaller than the second one, if not please check whether cudnn, cuda, and pytorch versions match.")
-
+    def check(self):
+        import torch
+        print(torch.cuda.is_available())
     # def gui(self):
     #     """
     #     \nGraphic User Interface\n
