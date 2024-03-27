@@ -21,6 +21,7 @@ To post to the forum you can either use the web interface or email to spisonet@g
 # Installation
 
 We suggest using anaconda environment to manage the spIsoNet package.
+The installation involves 4 steps: 1. Install anaconda and create a conda environment. 2. Install cuda and pytorch. 3. Install spIsoNet and dependencies. 4. For Misalignment correction, setup RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE and CONDA_ENV environment variable
 
 Example commands to install spIsoNet
 

@@ -48,8 +48,8 @@ class ISONET:
         """
         \nTrain neural network to correct preffered orientation\n
         spisonet.py reconstruct half.mrc FSC3D.mrc --mask mask.mrc --limit_res 3.5 [--gpuID] [--ncpus] [--output_dir] [--fsc_file]...
-        :param i1: Input half map 1
-        :param i2: Input half map 2
+        :param i1: Input half-map 1
+        :param i2: Input half-map 2
         :param aniso_file: 3DFSC file
         :param mask: Filename of a user-provided mask
         :param independent: Independently process half1 and half2, this will disable the noise2noise-based denoising but will provide independent maps for gold-standard FSC
