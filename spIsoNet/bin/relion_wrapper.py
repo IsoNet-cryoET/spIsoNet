@@ -291,7 +291,7 @@ if __name__=="__main__":
         for line in f.readlines():
             if "_rlnImagePixelSize" in line:
                 sampling_index = int(line.split()[1].split("#")[1])
-            if "opticsGroup1" in line:
+            if "opticsGroup" in line:
                 sampling = float(line.split()[sampling_index-1])
                 if not silence:
                     print("pixel size = %s" %sampling) 
