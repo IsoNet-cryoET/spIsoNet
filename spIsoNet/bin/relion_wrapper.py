@@ -340,10 +340,8 @@ if __name__=="__main__":
         final_fsc = '%s/%s_3DFSC.mrc' %(dir,basename)
         print("-----------")
         print("Important information for the final iteration!!!")
-        print("The final half_unfil maps are generated with relion not spIsoNet")
+        print("The final run_half1_class001_unfil.mrc and run_half1_class001_unfil.mrc maps are generated with relion not spIsoNet")
         print("You may want to further use spIsoNet to improve the final maps")
-        print("spIsoNet commands to correct final maps are:")
-
     else:
 
         if float(limit_resolution) > resolution_initial:
