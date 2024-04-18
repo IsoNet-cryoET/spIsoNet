@@ -209,7 +209,7 @@ The particle alignment will nevertheless be influenced by distorted map with per
 
 Here, spIsoNet is integrated into the RELION refinement process. In each iteration of RELION refinement, spIsoNet can be used to perform the 3D reconstruction to generate corrected maps and use those maps for orientation search in RELION refinement process.
 
-We tested both RELION3.1 and RELION4.0 work for spIsoNet *Misalignment Correction*
+We tested both RELION3.1 and RELION4.0 work for spIsoNet *Misalignment Correction*. RELION5 does not work.
 
 After *Misalignment Correction*, you may further perform spIsoNet *Anistropy Correction* using the RELION generated half-maps to improve the map quality. 
 
