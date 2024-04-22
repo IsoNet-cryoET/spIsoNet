@@ -212,7 +212,7 @@ class ISONET:
             voxel_size = mrc.voxel_size.x
             if voxel_size == 0:
                 voxel_size = 1
-            logging.info("voxel_size",voxel_size)
+            logging.info("voxel_size {}".format(voxel_size))
 
         if mask is not None:
             with mrcfile.open(mask,'r') as mrc:
