@@ -291,13 +291,15 @@ if __name__=="__main__":
         for line in f.readlines():
             if "_rlnImagePixelSize" in line:
                 sampling_index = int(line.split()[1].split("#")[1])
-            if "opticsGroup" in line:
+            if sampling_index and line[0] != '_':
                 sampling = float(line.split()[sampling_index-1])
                 if not silence:
                     print("pixel size = %s" %sampling) 
+                break
 
     # limit_resolution: last iter resolution at 0.143
     limit_resolution = 2*sampling
+    limit_resolution_05 = limit_resolution
     start_check = 10000
     with open("%s/%s_it%s_half1_model.star" %(dir,basename,beforeVar)) as file:
         signal = True
