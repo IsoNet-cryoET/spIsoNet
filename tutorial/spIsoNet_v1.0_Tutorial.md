@@ -5,7 +5,7 @@ spIsoNet is designed for single particle analysis and subtomogram averaging. For
 
 # 1. Installation
 
-The installation involves 4 steps: 1. Install anaconda and create a conda environment. 2. Install cuda and pytorch. 3. Install spIsoNet and dependencies. 4. For *Misalignment Correction*, set RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE and CONDA_ENV environment variable.
+The installation involves 4 steps: 1. Install anaconda and create a conda environment. 2. Install cuda and pytorch. 3. Install spIsoNet and dependencies. 4. For *Misalignment Correction*, set RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE and CONDA_ENV environment variable. The installation will takes about 10 min on a "normal" workstation. 
 
 The environment we tested are:
 1. cuda11.8 cudnn8.5 pytorch2.0.1, pytorch installed with pip.
@@ -83,7 +83,7 @@ mv emd_8731_msk_1.map emd_8731_msk_1.mrc
 The algorithm for 3D FSC is customized based on
 Tan, Y.Z., Baldwin, P.R., Davis, J.H., Williamson, J.R., Potter, C.S., Carragher, B. and Lyumkis, D., 2017. Addressing preferred specimen orientation in single-particle cryo-EM through tilting. Nature methods, 14(8), p.793.
 
-The 3DFSC volume (the default file name is FSC3D.mrc) should be generated in a few minutes. This step does not need GPU accelation. You can use multiple cpu cores for parallelization by specifying "--ncpus".
+The 3DFSC volume (the default file name is FSC3D.mrc) should be generated in a 3 minutes for a volume with 360x360x360 pixels. This step does not need GPU accelation. You can use multiple cpu cores for parallelization by specifying "--ncpus".
 
 Thie FSC3D.mrc will be used in the following reconstruct step as "aniso_file"
 
@@ -108,7 +108,7 @@ The expected command line output is shown as follows.
 
 ## 2.2. *Anisotropy Correction* of half-maps
 
-This step trains a network for *Anisotropy Correction* with "spisonet.py reconstruct".
+This step trains a network for *Anisotropy Correction* with "spisonet.py reconstruct". This step takes 15 minutes with 4x Nvidia A100 graphic cards
 
 This step will create a folder to store the output files of spIsoNet. The corrected map is stored as "correctedXXX.mrc" in that folder. You can also find trained neural network "XX.pt" and figure for loss change "loss.png" in the folder.  
 
@@ -215,6 +215,8 @@ After *Misalignment Correction*, you may further perform spIsoNet *Anistropy Cor
 
 The spIsoNet *Misalignment Correction* tutorial dataset can be downloaded from "https://ucla.box.com/s/ng459g8mhlf63z4sio5y4v432yt6k7qa".
 This is a subset of EMPIAR-10096, including particle star file (job025_tutorial.star), particle stack file (job025_tutorial.mrc), mask file (mask.mrc) and a low resolution reference at 10A resolution (HA_reference.mrc). From this dataset, we can obtain a 3.5A resolution structure with  *Misalignment Correction*.
+
+For *Misalignment Correction*, the overall estimated processing time on this tutorial dataset is about 6 hours with 4x Nvidia A100 graphic cards. 
 
 ## 4.1 Make sure spIsoNet is properly installed in a conda environment.
 
