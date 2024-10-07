@@ -351,37 +351,37 @@ export ISONET_ALPHA=1
 4. ISONET_START_HEALPIX defines angular sampling step when spIsoNet training will start to performed. ISONET_START_RESOLUTION defines refinement resolution when spIsoNet training will start to performed.
 
 ```
-ISONET_START_HEALPIX=3
-ISONET_START_RESOLUTION=15
+export ISONET_START_HEALPIX=3
+export ISONET_START_RESOLUTION=15
 ```
 
 5. ISONET_RETRAIN_EACH_ITER defines whether the network should be retrained from scratch or from previous iteration of relion refine. This is typically set to True
 ```
-ISONET_RETRAIN_EACH_ITER=True
+export ISONET_RETRAIN_EACH_ITER=True
 ```
 
 6. ISONET_EPOCHS defines how many epochs to train the neural network.
 ```
-ISONET_EPOCHS=5
+export ISONET_EPOCHS=5
 ```
 
 7. ISONET_ACC_BATCHES larger than 1 uses accumulate gradient to reduce memory consumption. Usually acc_batches can be 2 for most cases. If you have GPU with large memory, ISONET_ACC_BATCHES=1 should process slightly faster.
 ```
-ISONET_ACC_BATCHES=2
+export ISONET_ACC_BATCHES=2
 ```
 
 8. ISONET_KEEP_LOWRES define whether low resolution information from a correct reference is kept in the alignment. This parameter can be overwrite by the --keep_lowres parameter in relion command or GUI
 ```
-ISONET_KEEP_LOWRES=False
+export ISONET_KEEP_LOWRES=False
 ```
 
 9. ISONET_WHITENING define whether whitening is performed before running spIsoNet. Typically we set this value True.
 ISONET_WHITENING_LOW defines the starting resolution for whitening.
 ```
-ISONET_WHITENING=True
-ISONET_WHITENING_LOW=10
+export ISONET_WHITENING=True
+export ISONET_WHITENING_LOW=10
 ```
 10. ISONET_FSC_WEIGHTING define whether FSC weighting is performed before running spIsoNet. Typical we set this as True.
 ```
-ISONET_FSC_WEIGHTING=True
+export ISONET_FSC_WEIGHTING=True
 ```
