@@ -21,7 +21,7 @@ conda env create -f setup.yml
 conda activate spisonet
 ```
 
-and then set the following environment variable for *Misalignment Correction*
+and then set the following environment variable for *Misalignment Correction* (by adding these two lines in to .bashrc file and restart your terminal)
 ```
 export RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE="python <path to spIsoNet>/spIsoNet/bin/relion_wrapper.py"
 export CONDA_ENV="spisonet"
@@ -139,7 +139,13 @@ spisonet.py reconstruct --help
 
 ## 2.3. Postprocessing
 
-Postprocessing of the corrected half-maps is not implemented in spIsoNet. You can use *relion_postprocess* in RELION for sharpening.
+Postprocessing of the corrected half-maps is not implemented in spIsoNet. You can use *relion_postprocess* in RELION for sharpening. 
+
+For example:
+```
+relion_postprocess --i xx_half1_unfil.mrc --i2 xx_half2_unfil.mrc --mask mask.mrc --adhoc_bfac -100 --low_pass 3.5
+relion_postprocess --i xx_half1_unfil.mrc --i2 xx_half2_unfil.mrc --mask mask.mrc --auto_bfac
+```
 
 
 # 3. Advanced parameters
