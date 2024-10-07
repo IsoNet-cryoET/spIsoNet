@@ -144,6 +144,9 @@ Postprocessing of the corrected half-maps is not implemented in spIsoNet. You ca
 For example:
 ```
 relion_postprocess --i xx_half1_unfil.mrc --i2 xx_half2_unfil.mrc --mask mask.mrc --adhoc_bfac -100 --low_pass 3.5
+```
+or
+```
 relion_postprocess --i xx_half1_unfil.mrc --i2 xx_half2_unfil.mrc --mask mask.mrc --auto_bfac
 ```
 
