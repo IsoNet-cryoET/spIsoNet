@@ -33,7 +33,7 @@ def extract_subvolume(current_map, seeds, crop_size, output_dir, prefix=''):
 
 def map_refine(halfmap, mask, fsc3d, alpha, voxel_size, epochs = 10, mixed_precision = False,
                output_dir = "results", output_base="half", n_subvolume = 50, pretrained_model=None,
-               cube_size = 64, predict_crop_size=96, batch_size = 8, acc_batches=2, learning_rate= 3e-4, limit_res=None):
+               cube_size = 64, predict_crop_size=96, batch_size = 8, acc_batches=2, learning_rate= 3e-4, limit_res=None, filter_base=64):
 
     data_dir = output_dir+"/"+output_base+"_data"
     mkfolder(data_dir)
@@ -55,7 +55,7 @@ def map_refine(halfmap, mask, fsc3d, alpha, voxel_size, epochs = 10, mixed_preci
 
     logging.info("Start training!")
     from spIsoNet.models.network import Net
-    network = Net(filter_base = 64,unet_depth=3, add_last=True)
+    network = Net(filter_base = filter_base,unet_depth=3, add_last=True)
     if pretrained_model is not None:
         print(f"loading previous model {pretrained_model}")
         network.load(pretrained_model)
@@ -89,7 +89,7 @@ def map_refine(halfmap, mask, fsc3d, alpha, voxel_size, epochs = 10, mixed_preci
 
 def map_refine_n2n(halfmap1, halfmap2, mask, fsc3d, alpha, beta, voxel_size, epochs = 10, mixed_precision = False,
                output_dir = "results", output_base1="half1", output_base2="half2", n_subvolume = 50, pretrained_model=None,
-               cube_size = 64, predict_crop_size=96, batch_size = 8, acc_batches=2, learning_rate= 3e-4, debug_mode=False, limit_res=None):
+               cube_size = 64, predict_crop_size=96, batch_size = 8, acc_batches=2, learning_rate= 3e-4, debug_mode=False, limit_res=None, filter_base=64):
 
     data_dir_1 = output_dir+"/"+output_base1+"_data"
     data_dir_2 = output_dir+"/"+output_base2+"_data"
@@ -122,7 +122,7 @@ def map_refine_n2n(halfmap1, halfmap2, mask, fsc3d, alpha, beta, voxel_size, epo
 
     logging.info("Start training!")
     from spIsoNet.models.network_n2n import Net
-    network = Net(filter_base = 64,unet_depth=3, add_last=True)
+    network = Net(filter_base = filter_base,unet_depth=3, add_last=True)
     if pretrained_model is not None:
         print(f"loading previous model {pretrained_model}")
         network.load(pretrained_model)

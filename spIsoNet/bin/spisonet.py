@@ -42,7 +42,8 @@ class ISONET:
                    predict_crop_size: int=80,
                    batch_size: int=None, 
                    acc_batches: int=2,
-                   learning_rate: float=3e-4
+                   learning_rate: float=3e-4,
+                   filter_base: int = 32
                    ):
 
         """
@@ -171,18 +172,18 @@ class ISONET:
             map_refine(halfmap1, mask_vol, fsc3d, alpha = alpha,  voxel_size=voxel_size, output_dir=output_dir, 
                    output_base=output_base1, mixed_precision=False, epochs = epochs,
                    n_subvolume=n_subvolume, cube_size=cube_size, pretrained_model=pretrained_model,
-                   batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size, learning_rate=learning_rate, limit_res= limit_res)
+                   batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size, learning_rate=learning_rate, limit_res= limit_res, filter_base= filter_base)
         if (i2 is not None) and independent:
             logging.info("processing half2")
             map_refine(halfmap1, mask_vol, fsc3d, alpha = alpha,  voxel_size=voxel_size, output_dir=output_dir, 
                    output_base=output_base2, mixed_precision=False, epochs = epochs,
                    n_subvolume=n_subvolume, cube_size=cube_size, pretrained_model=pretrained_model,
-                   batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size,learning_rate=learning_rate, limit_res= limit_res)
+                   batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size,learning_rate=learning_rate, limit_res= limit_res, filter_base= filter_base)
         if (i2 is not None) and (not independent):
             map_refine_n2n(halfmap1,halfmap2, mask_vol, fsc3d, alpha = alpha,beta=beta,  voxel_size=voxel_size, output_dir=output_dir, 
                    output_base1=output_base1, output_base2=output_base2, mixed_precision=False, epochs = epochs,
                    n_subvolume=n_subvolume, cube_size=cube_size, pretrained_model=pretrained_model,
-                   batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size, learning_rate=learning_rate, limit_res= limit_res)
+                   batch_size = batch_size, acc_batches = acc_batches,predict_crop_size=predict_crop_size, learning_rate=learning_rate, limit_res= limit_res, filter_base= filter_base)
 
         if limit_res is not None:
             logging.info("combining")
