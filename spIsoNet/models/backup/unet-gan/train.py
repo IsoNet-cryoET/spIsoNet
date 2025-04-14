@@ -22,7 +22,7 @@ def reload_ckpt_bis(ckpt, model, device=torch.device("cuda:0")):
     if os.path.isfile(ckpt):
         print(f"--> loading checkpoint {ckpt}")
         #try:
-        checkpoint = torch.load(ckpt, map_location = device)
+        checkpoint = torch.load(ckpt, map_location = device, weights_only=False)
         #start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'])
         return 0#start_epoch
@@ -35,7 +35,7 @@ def reload_ckpt(ckpt, model, device=torch.device("cuda:0")):
     if os.path.isfile(ckpt):
         print(f"=> loading checkpoint {ckpt}")
         
-        checkpoint = torch.load(ckpt, map_location=device)
+        checkpoint = torch.load(ckpt, map_location=device, weights_only=False)
         start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'])
         return start_epoch

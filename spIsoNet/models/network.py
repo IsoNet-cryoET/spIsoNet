@@ -207,7 +207,7 @@ class Net:
                         "avg_val_loss":[] }
 
     def load(self, path):
-        checkpoint = torch.load(path)
+        checkpoint = torch.load(path, weights_only=False)
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.metrics["average_loss"] = checkpoint['average_loss']
 
@@ -241,7 +241,7 @@ class Net:
            dist.destroy_process_group() 
            os.system("kill $(ps aux | grep multiprocessing.spawn | grep -v grep | awk '{print $2}')")
 
-        checkpoint = torch.load(model_path)
+        checkpoint = torch.load(model_path, weights_only=False)
         self.metrics['average_loss'].extend(checkpoint['average_loss'])
         self.model.load_state_dict(checkpoint['model_state_dict'])
         torch.save({
