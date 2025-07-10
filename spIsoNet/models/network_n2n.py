@@ -81,11 +81,11 @@ def ddp_train(rank, world_size, port_number, model,alpha, beta, data_path, batch
             model.train()
             # have to convert to tensor because reduce needed it
             average_loss = torch.tensor(0, dtype=torch.float).to(rank)
+            optimizer.zero_grad()
             for i, batch in enumerate(train_loader):
                 x1, x2 = batch
                 x1 = x1.cuda()
                 x2 = x2.cuda()
-                optimizer.zero_grad(set_to_none=True)
                 if mixed_precision:
                     with torch.cuda.amp.autocast():
                         preds = model(x1)
@@ -166,6 +166,7 @@ def ddp_train(rank, world_size, port_number, model,alpha, beta, data_path, batch
                         scaler.update()
                     else:
                         optimizer.step()
+                        optimizer.zero_grad()
 
                 if rank == 0 and ( (i+1)%acc_batches == 0 ):
                    progress_bar.set_postfix({"Loss": loss_item})#, "t1": time2-time1, "t2": time3-time2, "t3": time4-time3})
