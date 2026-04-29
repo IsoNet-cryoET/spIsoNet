@@ -66,7 +66,7 @@ export PYTHONPATH=<path to spIsoNet>:$PYTHONPATH
 The default parameters in spIsoNet should be suitable in most cases.
 
 ## 2.0 Prepare data set
-The tutorial data can be downloaded here: https://ucla.box.com/s/f77cl64g28tth0vldq2mqhn022gyhb80 or https://www.ebi.ac.uk/emdb/EMD-8731?tab=interpretation
+The tutorial data can be downloaded here: https://zenodo.org/records/12640059 or https://www.ebi.ac.uk/emdb/EMD-8731?tab=interpretation
 
 
 Two half-maps (emd_8731_half_map_1.mrc and emd_8731_half_map_2.mrc) and a solvent mask (emd_8731_msk_1.mrc) are needed for *Anistropy Correction* tutorial.
@@ -222,7 +222,7 @@ We tested both RELION3.1 and RELION4.0 work for spIsoNet *Misalignment Correctio
 
 After *Misalignment Correction*, you may further perform spIsoNet *Anistropy Correction* using the RELION generated half-maps to improve the map quality. 
 
-The spIsoNet *Misalignment Correction* tutorial dataset can be downloaded from "https://ucla.box.com/s/ng459g8mhlf63z4sio5y4v432yt6k7qa".
+The spIsoNet *Misalignment Correction* tutorial dataset can be downloaded from "https://zenodo.org/records/12640059".
 This is a subset of EMPIAR-10096, including particle star file (job025_tutorial.star), particle stack file (job025_tutorial.mrc), mask file (mask.mrc) and a low resolution reference at 10A resolution (HA_reference.mrc). From this dataset, we can obtain a 3.5A resolution structure with  *Misalignment Correction*.
 
 For *Misalignment Correction*, the overall estimated processing time on this tutorial dataset is about 6 hours with 4x Nvidia A100 graphic cards. 
