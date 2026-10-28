@@ -44,18 +44,34 @@ def calculate_resolution(half1_file, half2_file, mask_file=None, voxel_size=1, t
     fsc_map = get_FSC_map([h1,h2],mask)
     return recommended_resolution(fsc_map, voxel_size, threshold = threshold)
 
-def recommended_resolution(fsc3d, voxel_size, threshold = 0.143):
+def recommended_resolution(fsc3d, voxel_size, threshold=0.143):
+    """Estimate resolution from the first valid radial FSC crossing.
+
+    Shell 0 is excluded because the DC coefficient is not a meaningful
+    resolution crossing. If no valid crossing is found, retain the
+    legacy fallback of 2 * voxel_size.
+    """
     diameter = fsc3d.shape[0]
-    center = diameter//2
-    grid  = np.mgrid[0:diameter,0:diameter,0:diameter]
-    r = ((grid[0]-center)**2 + (grid[1]-center)**2 + (grid[2]-center)**2)**0.5
-    r = r.astype(np.int32).flatten()
-    a = np.zeros(center, dtype = np.float32)
+    center = diameter // 2
+
+    grid = np.mgrid[0:diameter, 0:diameter, 0:diameter]
+    r = np.sqrt(
+        (grid[0] - center) ** 2
+        + (grid[1] - center) ** 2
+        + (grid[2] - center) ** 2
+    ).astype(np.int32).flatten()
+
     df = fsc3d.flatten()
-    for i in range(len(a)):        
-        a[i] = np.average(df[r==i])
-        if a[i] < threshold:
-            return center/(i+1)*2 * voxel_size
+
+    # Skip shell 0 (DC); use the existing floor-based shell definition.
+    for i in range(1, center):
+        values = df[r == i]
+        values = values[np.isfinite(values)]
+
+        if values.size > 0 and values.mean() < threshold:
+            return center / (i + 1) * 2 * voxel_size
+
+    # Preserve compatibility with existing callers.
     return 2 * voxel_size
 
 def combine_map_F(low_data, high_data, threshold_res, voxel_size, mask_data=None):
